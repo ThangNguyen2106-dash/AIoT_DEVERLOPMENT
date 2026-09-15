@@ -70,7 +70,11 @@ namespace EdgeAI
         bool isCalibrated() const { return _isCalibrated; }
         uint32_t getSampleCount() const { return _welford.getCount(); }
         float getBaselineMean() const { return _welford.getMean(); }
-        float getBaselineStdDev() const { return _welford.getStdDev(); }
+        float getBaselineStdDev() const
+        {
+            float s = _welford.getStdDev();
+            return (s < 0.25f) ? 0.25f : s;
+        }
 
         void reset()
         {
