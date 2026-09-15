@@ -36,7 +36,7 @@ namespace EdgeAI
                 return 0.0f;
             }
 
-            float z = _welford.computeZScore(value);
+            float z = _welford.computeZScore(value, 1.2f);
             // Chuẩn hóa điểm bất thường từ [0, threshold * 1.5] về [0.0, 1.0]
             float score = z / (_threshold * 1.5f);
             if (score > 1.0f)
@@ -45,6 +45,13 @@ namespace EdgeAI
                 score = 0.0f;
 
             isAnomalyOut = (z >= _threshold);
+
+            // Tự thích nghi từ từ khi mẫu an toàn bình thường (Z < 1.5σ) để theo kịp trôi dạt nhiệt độ ngày/đêm
+            if (z < 1.5f)
+            {
+                learn(value);
+            }
+
             return score;
         }
 
@@ -53,7 +60,7 @@ namespace EdgeAI
         {
             if (!_isCalibrated)
                 return 0.0f;
-            float z = _welford.computeZScore(value);
+            float z = _welford.computeZScore(value, 1.2f);
             float score = z / (_threshold * 1.5f);
             return (score > 1.0f) ? 1.0f : ((score < 0.0f) ? 0.0f : score);
         }
@@ -62,7 +69,7 @@ namespace EdgeAI
         {
             if (!_isCalibrated)
                 return false;
-            return _welford.computeZScore(value) >= _threshold;
+            return _welford.computeZScore(value, 1.2f) >= _threshold;
         }
 
         void setThreshold(float threshold) { _threshold = threshold; }
@@ -73,7 +80,7 @@ namespace EdgeAI
         float getBaselineStdDev() const
         {
             float s = _welford.getStdDev();
-            return (s < 0.25f) ? 0.25f : s;
+            return (s < 1.2f) ? 1.2f : s;
         }
 
         void reset()

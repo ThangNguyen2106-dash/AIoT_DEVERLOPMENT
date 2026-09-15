@@ -33,7 +33,7 @@ namespace EdgeAI
     class DeviceStateClassifier
     {
     public:
-        DeviceStateClassifier(float warningThresh = 0.5f, float criticalThresh = 0.85f)
+        DeviceStateClassifier(float warningThresh = 0.40f, float criticalThresh = 0.66f)
             : _warnThresh(warningThresh), _critThresh(criticalThresh)
         {
         }

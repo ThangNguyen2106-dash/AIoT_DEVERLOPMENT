@@ -35,11 +35,11 @@ namespace AI_Math
         float getStdDev() const { return sqrtf(getVariance()); }
 
         // Tính điểm bất thường Z-Score của một mẫu mới
-        float computeZScore(float x, float minStdDev = 0.25f) const
+        float computeZScore(float x, float minStdDev = 1.2f) const
         {
             float s = getStdDev();
             // Đảm bảo luôn có sàn độ biến thiên tối thiểu (Noise Floor) để tránh chia cho 0 
-            // và đảm bảo phát hiện được sự cố ngay cả khi môi trường lúc học hoàn toàn đứng yên (StdDev = 0)
+            // và lọc nhiễu tự nhiên của cảm biến (ví dụ DHT11 có bước nhảy tối thiểu 1.0°C)
             if (s < minStdDev)
                 s = minStdDev;
             return fabsf(x - mean) / s;
