@@ -80,6 +80,7 @@ namespace EdgeAI
         float getBaselineStdDev() const
         {
             float s = _welford.getStdDev();
+            return (s < 0.25f) ? 0.25f : s;
             return (s < 1.2f) ? 1.2f : s;
         }
 

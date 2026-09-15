@@ -39,6 +39,7 @@ namespace AI_Math
         {
             float s = getStdDev();
             // Đảm bảo luôn có sàn độ biến thiên tối thiểu (Noise Floor) để tránh chia cho 0 
+            // và đảm bảo phát hiện được sự cố ngay cả khi môi trường lúc học hoàn toàn đứng yên (StdDev = 0)
             // và lọc nhiễu tự nhiên của cảm biến (ví dụ DHT11 có bước nhảy tối thiểu 1.0°C)
             if (s < minStdDev)
                 s = minStdDev;

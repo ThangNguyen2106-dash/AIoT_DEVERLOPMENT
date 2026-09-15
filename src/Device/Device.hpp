@@ -133,6 +133,10 @@ public:
     {
         actuators.setLed(state);
 #if defined(ESP32)
+        if (state)
+            rgb(64, 64, 64);
+        else
+            rgb(0, 0, 0);
         // Chỉ fallback sang đèn RGB nếu thiết bị không có chân RGB chuyên dụng
         if (actuators.getRgbPin() < 0)
         {
