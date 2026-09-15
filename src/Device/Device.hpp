@@ -204,7 +204,11 @@ private:
     bool _initialized;
 };
 
+#if __cplusplus >= 201703L
+inline AIoTDeviceManager AIoT_Device;
+#else
 extern AIoTDeviceManager AIoT_Device;
+#endif
 
 #endif /* AIOT_DEVICE_HPP */
 
