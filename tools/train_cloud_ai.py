@@ -85,7 +85,7 @@ Hãy suy luận sắc bén theo ISO 10816-3, trả lời súc tích bằng tiế
 # =============================================================================
 # BƯỚC 3: GỬI TRUY VẤN TỚI GOOGLE GEMINI (REST API CHUẨN)
 # =============================================================================
-def ask_gemini_rest(prompt, api_key, model="gemini-1.5-flash"):
+def ask_gemini_rest(prompt, api_key, model="gemini-3.5-flash-lite"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [
@@ -133,7 +133,7 @@ def test_cloud_ai():
         return
 
     print(f"[*] Sử dụng API Key: {api_key[:6]}...{api_key[-4:]}")
-    print("[*] Đang kết nối tới mô hình: gemini-1.5-flash...")
+    print("[*] Đang kết nối tới mô hình: gemini-3.5-flash-lite...")
     print("[*] Đã nạp thành công bộ Tri thức chuyên sâu ISO 10816-3 & Action Protocol!\n")
 
     test_queries = [

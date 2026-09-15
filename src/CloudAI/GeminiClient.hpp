@@ -11,7 +11,7 @@ namespace CloudAI
     class GeminiClient
     {
     public:
-        GeminiClient(const char *apiKey = "", const char *model = "gemini-1.5-flash")
+        GeminiClient(const char *apiKey = "", const char *model = "gemini-3.5-flash-lite")
             : _model(model), _timeoutMs(15000)
         {
             setApiKey(apiKey);
