@@ -29,6 +29,14 @@ namespace AI_Math
             M2 = 0.0f;
         }
 
+        // Khởi tạo điểm chuẩn danh định (Nominal Baseline & Tolerance) trực tiếp
+        void seed(float initialMean, float initialStdDev, uint32_t virtualCount = 30)
+        {
+            count = (virtualCount < 2) ? 2 : virtualCount;
+            mean = initialMean;
+            M2 = (initialStdDev * initialStdDev) * (float)(count - 1);
+        }
+
         uint32_t getCount() const { return count; }
         float getMean() const { return mean; }
         float getVariance() const { return (count > 1) ? (M2 / (float)(count - 1)) : 0.0f; }

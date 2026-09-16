@@ -40,6 +40,27 @@ public:
         edge.begin(zThreshold, calibSamples);
     }
 
+    // Các hàm dạy Edge AI trực quan:
+    void teachBaseline(float nominalMean, float toleranceStdDev = 1.2f)
+    {
+        edge.teachBaseline(nominalMean, toleranceStdDev);
+    }
+
+    void train(const float *samples, size_t count)
+    {
+        edge.train(samples, count);
+    }
+
+    void autoLearn(uint32_t calibSamples = 30, float zThreshold = 3.0f)
+    {
+        edge.autoLearn(calibSamples, zThreshold);
+    }
+
+    void teachNormal(float sample)
+    {
+        edge.teachNormal(sample);
+    }
+
     // Xử lý mẫu cảm biến: Chạy Edge AI + Phản xạ bảo vệ tại chỗ + Trả về kết quả
     EdgeAI::InferenceResult process(float sensorSample, uint8_t emergencyRelayIndex = 1)
     {

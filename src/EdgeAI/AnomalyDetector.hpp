@@ -95,6 +95,29 @@ namespace EdgeAI
             reset();
         }
 
+        // 1. DẠY BẰNG MỐC CHUẨN (Nominal Value + Tolerance):
+        // Ví dụ: teachBaseline(28.0f, 1.5f) -> Chuẩn 28°C, sai số cho phép ±1.5°C
+        void teachBaseline(float nominalMean, float toleranceStdDev = 1.2f)
+        {
+            reset();
+            _welford.seed(nominalMean, toleranceStdDev, _calibSamples);
+            _isCalibrated = true;
+        }
+
+        // 2. DẠY BẰNG TẬP MẪU THỰC NGHIỆM (Golden Samples):
+        // Ví dụ: float data[] = {27.8, 28.2, 28.0}; train(data, 3);
+        void train(const float *samples, size_t count)
+        {
+            if (!samples || count == 0)
+                return;
+            reset();
+            for (size_t i = 0; i < count; i++)
+            {
+                _welford.update(samples[i]);
+            }
+            _isCalibrated = true;
+        }
+
         void reset()
         {
             _welford.reset();

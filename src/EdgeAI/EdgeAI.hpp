@@ -31,7 +31,42 @@ namespace EdgeAI
             calibrate(calibrationSamples, zThreshold);
         }
 
-        // 1. DẠY LẠI TỪ ĐẦU (Calibrate): Học lại Baseline môi trường mới với N mẫu
+        // ======================================================
+        // CÁC HÀM DẠY CHO EDGE AI (TRỰC QUAN & DỄ HIỂU TRONG CODE):
+        // ======================================================
+
+        // 1. DẠY BẰNG MỐC CHUẨN (Nominal Value + Tolerance):
+        // Dùng khi bạn đã biết thông số thiết kế mạch/môi trường (Ví dụ: 28°C ± 1.5°C)
+        // Hệ thống sẽ sẵn sàng giám sát ngay lập tức, không cần chờ gom mẫu.
+        void teachBaseline(float nominalMean, float toleranceStdDev = 1.2f)
+        {
+            _detector.teachBaseline(nominalMean, toleranceStdDev);
+            _slidingWindow.clear();
+            _anomalyStreak = 0;
+            _lastSample = nominalMean;
+        }
+
+        // 2. DẠY BẰNG TẬP MẪU THỰC NGHIỆM (Golden Samples Array):
+        // Dùng khi bạn đo thử nghiệm vài mẫu lúc máy chạy êm và nạp thẳng vào code:
+        // float golden[] = {27.8, 28.2, 28.0, 27.9}; engine.train(golden, 4);
+        void train(const float *samples, size_t count)
+        {
+            _detector.train(samples, count);
+            _slidingWindow.clear();
+            _anomalyStreak = 0;
+            if (count > 0 && samples != nullptr)
+            {
+                _lastSample = samples[count - 1];
+            }
+        }
+
+        // 3. DẠY TỰ ĐỘNG THU THẬP TẠI CHỖ (Auto Calibration / Tare):
+        // Tự gom N mẫu từ cảm biến lúc khởi động để học đường cơ sở môi trường.
+        void autoLearn(uint32_t calibrationSamples = 30, float zThreshold = 3.0f)
+        {
+            calibrate(calibrationSamples, zThreshold);
+        }
+
         void calibrate(uint32_t calibrationSamples = 30, float zThreshold = 3.0f)
         {
             _detector.calibrate(calibrationSamples, zThreshold);
@@ -40,7 +75,8 @@ namespace EdgeAI
             _lastSample = 0.0f;
         }
 
-        // 2. DẠY MẪU CHUẨN TRỰC TIẾP (Online Teaching): Nạp một mẫu được xác nhận là bình thường
+        // 4. DẠY MẪU CHUẨN TRỰC TIẾP LÚC CHẠY (Online Teaching):
+        // Khi máy đổi chế độ tải hoặc bạn xác nhận giá trị hiện tại là an toàn:
         void teachNormal(float sample)
         {
             _detector.learn(sample);
