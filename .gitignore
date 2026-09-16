@@ -3,9 +3,6 @@
 .pioenvs
 .piolibdeps
 
-# Local test entry (kept locally for testing in VSCode, not pushed to GitHub library repo)
-src/main.cpp
-
 # Editor / IDE
 .vscode/*
 !.vscode/settings.json
