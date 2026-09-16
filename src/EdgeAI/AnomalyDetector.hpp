@@ -88,6 +88,13 @@ namespace EdgeAI
             return _welford.computeZScore(value, 1.2f);
         }
 
+        void calibrate(uint32_t samples = 30, float zThreshold = 3.0f)
+        {
+            _threshold = zThreshold;
+            _calibSamples = samples;
+            reset();
+        }
+
         void reset()
         {
             _welford.reset();
