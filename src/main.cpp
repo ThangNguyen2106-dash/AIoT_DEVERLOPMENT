@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define DEBUG_COLOR
+// #define DEBUG_COLOR
 #define BUTTON_CONFIG
 
 // 1. Cấu hình phần cứng (ESP32-S3 Kit)
@@ -622,6 +622,24 @@ void handleSerialChat(float sensorValue)
                     return;
                 }
 
+                // LỆNH ĐẶC BIỆT 2B: Tra cứu trạng thái kết nối Wi-Fi & MQTT (không gây nhiễu màn hình chat)
+                if (userText.equalsIgnoreCase("/wifi") || userText.equalsIgnoreCase("wifi") || userText.equalsIgnoreCase("/net"))
+                {
+                    Serial.println("\n📶 ========================================================");
+                    Serial.println("   TRẠNG THÁI KẾT NỐI MẠNG (NETWORK STATUS)");
+                    Serial.println("--------------------------------------------------------");
+                    Serial.printf("   - Wi-Fi Status : %s\n", (WiFi.status() == WL_CONNECTED) ? "CONNECTED ✅" : "DISCONNECTED ❌ (Đang tự động kết nối ngầm)");
+                    if (WiFi.status() == WL_CONNECTED)
+                    {
+                        Serial.printf("   - SSID         : %s\n", WiFi.SSID().c_str());
+                        Serial.printf("   - IP Address   : %s\n", WiFi.localIP().toString().c_str());
+                        Serial.printf("   - Tín hiệu RSSI: %d dBm\n", WiFi.RSSI());
+                    }
+                    Serial.printf("   - HiveMQ MQTT  : %s\n", (serverMQTT.check_connect()) ? "CONNECTED ✅" : "DISCONNECTED ❌");
+                    Serial.println("========================================================\n");
+                    return;
+                }
+
                 // LỆNH ĐẶC BIỆT 3: Tự động gom mẫu học lại Baseline (Auto-Learn)
                 if (userText.equalsIgnoreCase("/autolearn") || userText.equalsIgnoreCase("/calibrate") || userText.equalsIgnoreCase("calibrate"))
                 {
@@ -1086,25 +1104,20 @@ void loop()
             float scoreNow = hybridAI.edge.getDetector().predictScore(currentTemp);
             const char *stateStr = (zNow >= 3.0f) ? "CRITICAL" : ((zNow >= 1.5f) ? "WARNING" : "NORMAL");
 
-            const char *wifiStr = (WiFi.status() == WL_CONNECTED) ? "ONLINE" : "RETRYING...";
-            const char *mqttStr = (AIoT.CheckConnect() && serverMQTT.check_connect()) ? "ONLINE" : "OFFLINE";
-
             if (dhtSensor.isOk())
             {
-                Serial.printf("🌡️ [DHT11]: %.1f °C, %.1f %% | 🧠 [Edge AI]: Z=%.2fσ [%s - Score: %.2f] | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s | 📶 WiFi: %s | ☁️ MQTT: %s\n",
+                Serial.printf("🌡️ [DHT11]: %.1f °C, %.1f %% | 🧠 [Edge AI]: Z=%.2fσ [%s - Score: %.2f] | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s\n",
                               currentTemp, currentHum, zNow, stateStr, scoreNow,
                               currentPotPercent,
                               AIoT_Device.getRelay(1) ? "ON" : "OFF",
-                              AIoT_Device.getRelay(2) ? "ON" : "OFF",
-                              wifiStr, mqttStr);
+                              AIoT_Device.getRelay(2) ? "ON" : "OFF");
             }
             else
             {
-                Serial.printf("⏳ [DHT11]: Đang đọc... | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s | 📶 WiFi: %s | ☁️ MQTT: %s\n",
+                Serial.printf("⏳ [DHT11]: Đang đọc... | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s\n",
                               currentPotPercent,
                               AIoT_Device.getRelay(1) ? "ON" : "OFF",
-                              AIoT_Device.getRelay(2) ? "ON" : "OFF",
-                              wifiStr, mqttStr);
+                              AIoT_Device.getRelay(2) ? "ON" : "OFF");
             }
         }
     }
