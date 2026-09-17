@@ -26,7 +26,12 @@ const char *MQTT_USER = "IoT_TEST";
 const char *MQTT_PASS = "mt21062005";
 
 // Gemini API Key (Lấy tại aistudio.google.com)
-const char *GEMINI_API_KEY = "AIzaSyC5RNvxMgKALp74Qr5KxgEge3a3xRHATPQ";
+// Tự động nạp từ secrets.h (được .gitignore bảo vệ, không bao giờ đẩy lên Git để tránh bị Google hủy Key)
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+const char *GEMINI_API_KEY = "YOUR_GEMINI_API_KEY";
+#endif
 
 HybridAIEngine hybridAI;
 
@@ -219,32 +224,26 @@ static bool simulateSensorAnomaly = false;
 
 // ======================================================
 // CẤU HÌNH PROMPT CHO CLOUD AI (GEMINI):
-// Dạy cho Gemini biết hệ thống có thêm Relay 2 và quy tắc điều khiển
+// Dạy cho Gemini biết phần cứng, quy tắc điều khiển và phong cách trả lời thông minh
 // ======================================================
 const char *AI_SYSTEM_PROMPT =
     "Bạn là trợ lý AI thông minh tích hợp trên bo mạch ESP32-S3 thuộc hệ thống Hybrid AIoT.\n"
-    "Phần cứng bo mạch gồm có:\n"
-    "- Cảm biến nhiệt độ & độ ẩm DHT11 gắn tại chân GPIO 5.\n"
-    "- Cảm biến giả lập bằng biến trở (Potentiometer) gắn tại chân GPIO 6 (ADC1, đo từ 0 - 4095, tương ứng 0.0 - 100.0% hoặc 0.0 - 3.3V).\n"
-    "- Rơ-le 1 (Relay 1 / Quạt / Tải chính) gắn tại chân GPIO 14.\n"
-    "- Rơ-le 2 (Relay 2 / Máy bơm / Van tưới / Tải phụ) gắn tại chân GPIO 15.\n"
-    "- Đèn LED RGB onboard (chân GPIO 48).\n"
-    "Bạn có khả năng phân tích dữ liệu cảm biến và trực tiếp điều khiển thiết bị phần cứng.\n"
-    "Khi người dùng yêu cầu thao tác phần cứng hoặc khi chẩn đoán cần can thiệp, hãy đính kèm thẻ lệnh tương ứng:\n"
-    "- Bật đèn LED (onboard): [CMD:LED_ON]\n"
-    "- Tắt đèn LED (onboard): [CMD:LED_OFF]\n"
-    "- Chớp nháy đèn LED: [CMD:LED_BLINK]\n"
-    "- Đổi màu LED RGB: [CMD:RGB:R,G,B] (ví dụ: [CMD:RGB:255,0,0] đỏ, [CMD:RGB:0,255,0] xanh lá, [CMD:RGB:0,0,255] xanh lam)\n"
-    "- Bật Relay 1 (chân 14): [CMD:RELAY1_ON]\n"
-    "- Tắt Relay 1 (chân 14): [CMD:RELAY1_OFF]\n"
-    "- Bật Relay 2 (chân 15): [CMD:RELAY2_ON]\n"
-    "- Tắt Relay 2 (chân 15): [CMD:RELAY2_OFF]\n"
-    "- Bíp còi cảnh báo: [CMD:BEEP]\n"
-    "- Yêu cầu Edge AI cân chỉnh lại: [CMD:CALIBRATE]\n"
-    "- Dạy Edge AI ghi nhận nhiệt độ hiện tại là bình thường: [CMD:TEACH]\n"
-    "Ví dụ: Nếu người dùng bảo 'bật relay 1' hoặc 'bật quạt', trả lời kèm [CMD:RELAY1_ON]. "
-    "Nếu người dùng bảo 'bật relay 2' hoặc 'bật máy bơm', trả lời kèm [CMD:RELAY2_ON]. "
-    "Hãy luôn phản hồi ngắn gọn, thông minh, đúng trọng tâm bằng tiếng Việt.";
+    "Hệ thống phần cứng điều khiển gồm có:\n"
+    "- Rơ-le 1 (Relay 1 / Quạt / Tải chính) gắn tại chân GPIO 14: Bật [CMD:RELAY1_ON], Tắt [CMD:RELAY1_OFF]\n"
+    "- Rơ-le 2 (Relay 2 / Máy bơm / Van tưới / Tải phụ) gắn tại chân GPIO 15: Bật [CMD:RELAY2_ON], Tắt [CMD:RELAY2_OFF]\n"
+    "- Đèn LED đơn (onboard): Bật [CMD:LED_ON], Tắt [CMD:LED_OFF], Chớp nháy [CMD:LED_BLINK]\n"
+    "- Đèn LED RGB onboard (chân GPIO 48): Đổi màu [CMD:RGB:R,G,B] (ví dụ: [CMD:RGB:255,0,0] đỏ, [CMD:RGB:0,255,0] xanh lá, [CMD:RGB:0,0,255] xanh lam)\n"
+    "- Còi Buzzer: Bíp cảnh báo [CMD:BEEP]\n"
+    "- Cân chỉnh Baseline Edge AI: [CMD:CALIBRATE]\n"
+    "- Dạy Edge AI nhiệt độ an toàn: [CMD:TEACH]\n"
+    "\n"
+    "QUY TẮC PHẢN HỒI (CỰC KỲ QUAN TRỌNG):\n"
+    "1. Khi người dùng trò chuyện tự do, hỏi thăm, hỏi kiến thức, kể chuyện, làm thơ:\n"
+    "   -> Hãy trả lời tự nhiên, thân thiện, vui vẻ. TUYỆT ĐỐI KHÔNG tự tiện đề cập đến nhiệt độ, độ ẩm hay thông số cảm biến nếu người dùng KHÔNG hỏi đến chúng!\n"
+    "2. Chỉ khi người dùng hỏi về nhiệt độ, độ ẩm, biến trở, tình trạng phòng/thiết bị, hoặc khi phát hiện sự cố khẩn cấp:\n"
+    "   -> Mới sử dụng các số liệu cảm biến trong ngữ cảnh để phân tích và báo cáo.\n"
+    "3. Khi người dùng yêu cầu bật/tắt thiết bị (quạt, bơm, đèn, relay,...):\n"
+    "   -> Trả lời ngắn gọn, kèm đúng thẻ lệnh [CMD:...] tương ứng.";
 
 // ======================================================
 // BỘ THỰC THI LỆNH PHẦN CỨNG TỪ AI (ACTUATOR EXECUTOR)
@@ -398,11 +397,15 @@ bool teachLocalAICommands(String text, String &reply)
     }
 
     // -------------------------------------------------------------
-    // 3. DẠY CÂU HỎI VỀ NHIỆT ĐỘ & ĐỘ ẨM:
+    // 3. DẠY CÂU HỎI VỀ NHIỆT ĐỘ & ĐỘ ẨM PHÒNG:
+    // Chỉ kích hoạt khi hỏi về nhiệt độ phòng/cảm biến thực tế, tránh chặn nhầm câu hỏi tổng quát
     // -------------------------------------------------------------
-    if (text.indexOf("nhiệt độ") != -1 || text.indexOf("độ ẩm") != -1 || text.indexOf("thời tiết") != -1 || text.indexOf("temp") != -1)
+    if ((text.indexOf("nhiệt độ") != -1 || text.indexOf("độ ẩm") != -1 || text.indexOf("dht11") != -1) &&
+        (text.indexOf("phòng") != -1 || text.indexOf("hiện tại") != -1 || text.indexOf("bao nhiêu") != -1 ||
+         text.indexOf("mấy độ") != -1 || text.indexOf("xem") != -1 || text.indexOf("đo") != -1 ||
+         text == "nhiệt độ" || text == "độ ẩm"))
     {
-        reply = "Nhiệt độ hiện tại đo được từ DHT11 là " + String(currentTemp, 1) + " °C, độ ẩm không khí đạt " + String(currentHum, 1) + " %.";
+        reply = "Nhiệt độ phòng hiện tại đo được từ DHT11 là " + String(currentTemp, 1) + " °C, độ ẩm không khí đạt " + String(currentHum, 1) + " %.";
         return true;
     }
 
@@ -757,7 +760,7 @@ void handleSerialChat(float sensorValue)
                     Serial.println("⏳ [CLOUD AI - HTTPS]: Đang gửi câu hỏi kèm dữ liệu DHT11 & Biến trở tới Gemini...");
 
                     String promptWithContext =
-                        "[Ngữ cảnh phần cứng thực tế: Cảm biến DHT11 (GPIO " + String(PIN_DHT11) + ") Nhiệt độ=" + String(currentTemp, 1) +
+                        "[Dữ liệu cảm biến phần cứng (chỉ dùng khi người dùng hỏi liên quan): Cảm biến DHT11 (GPIO " + String(PIN_DHT11) + ") Nhiệt độ=" + String(currentTemp, 1) +
                         " °C, Độ ẩm=" + String(currentHum, 1) +
                         " %, Biến trở GPIO 6=" + String(currentPotPercent, 1) +
                         " % (" + String(currentPotVolt, 2) + " V, ADC=" + String(currentPotRaw) +
@@ -770,13 +773,18 @@ void handleSerialChat(float sensorValue)
 
                     String reply = hybridAI.gemini.ask(promptWithContext, AI_SYSTEM_PROMPT);
 
-                    // Xử lý dự phòng nếu Cloud AI gặp lỗi mạng hoặc quá hạn mức 429
-                    if (reply.indexOf("429") != -1 || reply.indexOf("Error") != -1)
+                    // Báo lỗi chi tiết và trung thực ra Serial Monitor nếu Cloud AI gặp sự cố
+                    if (reply.startsWith("[Error") || reply.indexOf("Error") != -1)
                     {
-                        Serial.println("⚠️ [CLOUD AI]: Quota Gemini tạm bận hoặc mất mạng, chuyển sang xử lý dự phòng...");
-                        reply = "Hiện Cloud AI tạm bận. Hệ thống phần cứng vẫn hoạt động ổn định: DHT11 " +
-                                String(currentTemp, 1) + " °C, Relay 1: " + String(AIoT_Device.getRelay(1) ? "ON" : "OFF") +
-                                ", Relay 2: " + String(AIoT_Device.getRelay(2) ? "ON" : "OFF") + ".";
+                        Serial.printf("❌ [GEMINI CLOUD ERROR]: %s\n", reply.c_str());
+                        if (reply.indexOf("429") != -1)
+                        {
+                            Serial.println("💡 [GỢI Ý]: Đã chạm hạn mức Rate Limit của Gemini. Vui lòng đợi 30 giây rồi thử lại!");
+                        }
+                        else if (reply.indexOf("403") != -1)
+                        {
+                            Serial.println("💡 [GỢI Ý]: Khóa GEMINI_API_KEY bị từ chối hoặc hết quyền. Vui lòng kiểm tra lại Key trên aistudio.google.com!");
+                        }
                     }
 
                     // Phân tích và thực thi các thẻ lệnh phần cứng

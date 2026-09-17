@@ -383,6 +383,8 @@ template <class Transport>
 inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass)
 {
     WiFi.mode(WIFI_STA);
+    WiFi.persistent(true);
+    WiFi.setAutoReconnect(true);
     WiFi.setSleep(false);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     delay(500);
@@ -405,6 +407,8 @@ template <class Transport>
 inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_username, const char *mqtt_pass)
 {
     WiFi.mode(WIFI_STA);
+    WiFi.persistent(true);
+    WiFi.setAutoReconnect(true);
     WiFi.setSleep(false);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
     delay(500);
@@ -499,6 +503,12 @@ inline void PnP<Transport>::CONFIG_STA()
             {
                 delay(50);
             }
+            // Lưu lại SSID hiện tại vào bộ nhớ tạm để phục vụ Reconnect sau này
+            strncpy(_sta_ssid, saved_ssid[i].c_str(), sizeof(_sta_ssid) - 1);
+            _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+            strncpy(_sta_pass, saved_pass[i].c_str(), sizeof(_sta_pass) - 1);
+            _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+
             SaveWiFi(saved_ssid[i].c_str(), saved_pass[i].c_str());
             LOG_WIFI("WIFI", "WiFi signal strength: %s", (String(WiFi.RSSI()) + "dBm").c_str());
             WiFi_STATE = MODE_CONNECT_MQTT;
@@ -570,25 +580,36 @@ inline void PnP<Transport>::CONFIG_MQTT()
 template <class Transport>
 inline void PnP<Transport>::CONNECTED()
 {
+    static unsigned long lostWifiStart = 0;
     if (WiFi.status() != WL_CONNECTED)
     {
-        LOG_ERROR("WIFI", "LOST CONNECT TO WIFI");
-        WiFi_STATE = MODE_LOST_CONNECT_WIFI;
-        delay(1000);
+        if (lostWifiStart == 0)
+        {
+            lostWifiStart = millis();
+        }
+        else if (millis() - lostWifiStart > 3000) // Đợi 3s debounce để ESP32 auto-reconnect tự phục hồi
+        {
+            lostWifiStart = 0;
+            LOG_ERROR("WIFI", "LOST CONNECT TO WIFI");
+            WiFi_STATE = MODE_LOST_CONNECT_WIFI;
+        }
+        return;
     }
-    if (WiFi.status() == WL_CONNECTED)
+    else
     {
-        if (serverMQTT.check_connect())
-        {
-            serverMQTT.run();
-        }
-        if (!serverMQTT.check_connect())
-        {
-            LOG_ERROR("MQTT", "LOST CONNECT TO MQTT (state=%d)", serverMQTT.getState());
-            LOG_ERROR("MQTT", "TRY RECONNECT TO MQTT");
-            WiFi_STATE = MODE_LOST_CONNECT_MQTT;
-            delay(1000);
-        }
+        lostWifiStart = 0;
+    }
+
+    if (serverMQTT.check_connect())
+    {
+        serverMQTT.run();
+    }
+    else
+    {
+        LOG_ERROR("MQTT", "LOST CONNECT TO MQTT (state=%d)", serverMQTT.getState());
+        LOG_ERROR("MQTT", "TRY RECONNECT TO MQTT");
+        WiFi_STATE = MODE_LOST_CONNECT_MQTT;
+        delay(1000);
     }
 }
 
@@ -601,15 +622,23 @@ inline void PnP<Transport>::CONNECTED()
 template <class Transport>
 inline void PnP<Transport>::RECONNECT_WIFI()
 {
-    unsigned long t0 = millis();
     LOG_WIFI("WIFI", "RECONNECTING WIFI...");
-    // =========================
-    // RESET WIFI STATE SẠCH
-    // =========================
-    WiFi.disconnect(true);
-    delay(200);
-    WiFi.mode(WIFI_STA);
+
+    // Đồng bộ SSID từ bộ nhớ Flash NVS nếu biến tạm bị rỗng
+    if (strlen(_sta_ssid) == 0 && saved_ssid[0].length() > 0)
+    {
+        strncpy(_sta_ssid, saved_ssid[0].c_str(), sizeof(_sta_ssid) - 1);
+        _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+        strncpy(_sta_pass, saved_pass[0].c_str(), sizeof(_sta_pass) - 1);
+        _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+    }
+
+    // KHÔNG dùng WiFi.disconnect(true) vì sẽ ngắt hẳn RF radio (esp_wifi_stop)
+    // Dùng WiFi.disconnect(false) để hủy kết nối cũ nhưng giữ radio sẵn sàng
+    WiFi.disconnect(false);
     delay(100);
+    WiFi.mode(WIFI_STA);
+
     // =========================
     // 1. THỬ WIFI HIỆN TẠI
     // =========================
@@ -618,14 +647,15 @@ inline void PnP<Transport>::RECONNECT_WIFI()
         WiFi.begin(_sta_ssid, _sta_pass);
         LOG_WIFI("WIFI", "RECONNECT WIFI WITH: %s", _sta_ssid);
         unsigned long t_start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - t_start < time_STA)
+        unsigned long t_log = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t_start < 8000)
         {
-            if (millis() - t0 > 1000)
+            if (millis() - t_log > 1000)
             {
                 LOG_WIFI("WIFI", "RECONNECTING... %ds", (millis() - t_start) / 1000);
-                t0 = millis();
+                t_log = millis();
             }
-            delay(10);
+            delay(50);
         }
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -639,26 +669,28 @@ inline void PnP<Transport>::RECONNECT_WIFI()
             return;
         }
     }
+
     // =========================
     // 2. FALLBACK WIFI TRONG BỘ NHỚ
     // =========================
     for (int i = 0; i < Saved_WiFi_MAX; i++)
     {
-        if (saved_ssid[i].length() == 0)
+        if (saved_ssid[i].length() == 0 || saved_ssid[i] == _sta_ssid)
             continue;
-        WiFi.disconnect(true);
+        WiFi.disconnect(false);
         delay(100);
         WiFi.begin(saved_ssid[i].c_str(), saved_pass[i].c_str());
         LOG_WIFI("WIFI", "RECONNECT WIFI WITH: %s", saved_ssid[i].c_str());
         unsigned long t_start = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - t_start < time_STA)
+        unsigned long t_log = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - t_start < 8000)
         {
-            if (millis() - t0 > 1000)
+            if (millis() - t_log > 1000)
             {
                 LOG_WIFI("WIFI", "RECONNECTING... %ds", (millis() - t_start) / 1000);
-                t0 = millis();
+                t_log = millis();
             }
-            delay(10);
+            delay(50);
         }
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -667,17 +699,23 @@ inline void PnP<Transport>::RECONNECT_WIFI()
             {
                 delay(50);
             }
+            strncpy(_sta_ssid, saved_ssid[i].c_str(), sizeof(_sta_ssid) - 1);
+            _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+            strncpy(_sta_pass, saved_pass[i].c_str(), sizeof(_sta_pass) - 1);
+            _sta_pass[sizeof(_sta_pass) - 1] = '\0';
             LOG_WIFI("WIFI", "RECONNECT WIFI DONE (IP: %s)", WiFi.localIP().toString().c_str());
             WiFi_STATE = MODE_CONNECT_MQTT;
             return;
         }
     }
+
     // =========================
     // 3. FAIL
     // =========================
-    LOG_ERROR("WIFI", "RECONNECT WIFI FAILED");
+    LOG_ERROR("WIFI", "RECONNECT WIFI FAILED - WILL RETRY IN 5 SECONDS");
     WiFi_STATE = MODE_FAILD_CONNECT_WIFI;
 }
+
 template <class Transport>
 inline void PnP<Transport>::RECONNECT_MQTT()
 {
@@ -699,14 +737,15 @@ inline void PnP<Transport>::RECONNECT_MQTT()
     serverMQTT.begin();
     LOG_MQTT("MQTT", "TRY RECONNECT MQTT...");
     unsigned long t_start = millis();
-    while (!serverMQTT.check_connect() && millis() - t_start < time_STA)
+    unsigned long t_log = millis();
+    while (!serverMQTT.check_connect() && millis() - t_start < 8000)
     {
-        if (millis() - t0 > 1000)
+        if (millis() - t_log > 1000)
         {
             LOG_MQTT("MQTT", "RECONNECTING... %ds", (millis() - t_start) / 1000);
-            t0 = millis();
+            t_log = millis();
         }
-        delay(10);
+        delay(50);
     }
     // =========================
     // SUCCESS
@@ -714,7 +753,6 @@ inline void PnP<Transport>::RECONNECT_MQTT()
     if (serverMQTT.check_connect())
     {
         LOG_MQTT("MQTT", "MQTT RECONNECTED OK");
-        // save lại credentials nếu cần
         SaveMQTT(mqttusername, mqttpass);
         WiFi_STATE = MODE_CONNECTED;
         return;
@@ -779,9 +817,13 @@ template <class Transport>
 inline void PnP<Transport>::FAILD_WIFI()
 {
     static unsigned long lastFailTime = 0;
-    if (millis() - lastFailTime > 5000)
+    if (lastFailTime == 0)
     {
         lastFailTime = millis();
+    }
+    if (millis() - lastFailTime >= 5000)
+    {
+        lastFailTime = 0;
         LOG_WIFI("WIFI", "RETRYING STA CONNECTION...");
         WiFi_STATE = MODE_LOST_CONNECT_WIFI;
     }
@@ -901,6 +943,40 @@ inline void PnP<Transport>::run()
     case MODE_CONFIG:
         dnsServer.processNextRequest();
         webServer.handleClient();
+        {
+            static unsigned long lastAPRetry = 0;
+            if (lastAPRetry == 0)
+            {
+                lastAPRetry = millis();
+            }
+            // Định kỳ mỗi 15 giây, tự động kiểm tra xem WiFi đã lưu có hoạt động lại không
+            if (millis() - lastAPRetry > 15000)
+            {
+                lastAPRetry = millis();
+                bool hasKnown = (strlen(_sta_ssid) > 0) || (saved_ssid[0].length() > 0);
+                if (hasKnown)
+                {
+                    const char *targetSSID = (strlen(_sta_ssid) > 0) ? _sta_ssid : saved_ssid[0].c_str();
+                    const char *targetPass = (strlen(_sta_ssid) > 0) ? _sta_pass : saved_pass[0].c_str();
+                    LOG_WIFI("AP", "CHECKING IF KNOWN WIFI '%s' IS BACK ONLINE...", targetSSID);
+                    WiFi.begin(targetSSID, targetPass);
+                    unsigned long checkStart = millis();
+                    while (WiFi.status() != WL_CONNECTED && millis() - checkStart < 3000)
+                    {
+                        delay(50);
+                    }
+                    if (WiFi.status() == WL_CONNECTED)
+                    {
+                        LOG_WIFI("AP", "RECONNECTED TO '%s'! CLOSING AP MODE...", targetSSID);
+                        webServer.stop();
+                        dnsServer.stop();
+                        WiFi.softAPdisconnect(true);
+                        WiFi.mode(WIFI_STA);
+                        WiFi_STATE = MODE_CONNECT_MQTT;
+                    }
+                }
+            }
+        }
         break;
 
     default:
