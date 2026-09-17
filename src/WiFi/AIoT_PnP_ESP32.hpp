@@ -10,6 +10,8 @@
 #include <IoT/API.hpp>
 #include <MQTT/ESP32_MQTT.hpp>
 #include <WiFi/CONFIG_UI.h>
+#include <lwip/dns.h>
+#include <esp_netif.h>
 
 #define WIFI_AP_Subnet IPAddress(255, 255, 255, 0)
 char STA_WIFI_NAME[32];
@@ -47,6 +49,7 @@ class PnP
 
 public:
     PnP() {};
+    bool setupAndVerifyNetwork();
     // STARTUP_STATE
     void begin(const char *sta_ssid, const char *sta_pass);
     void begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_id, const char *mqtt_auth);
@@ -433,12 +436,76 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, co
 }
 
 //======================================================
+// NETWORK SETUP & DNS VERIFICATION
+//======================================================
+template <class Transport>
+inline bool PnP<Transport>::setupAndVerifyNetwork()
+{
+    // 1. Chờ IP và Gateway từ DHCP
+    unsigned long t_ip = millis();
+    while ((WiFi.localIP() == IPAddress(0, 0, 0, 0) || WiFi.gatewayIP() == IPAddress(0, 0, 0, 0)) && millis() - t_ip < 4000)
+    {
+        delay(50);
+    }
+
+    if (WiFi.localIP() == IPAddress(0, 0, 0, 0))
+    {
+        LOG_ERROR("WIFI", "DHCP FAILED TO OBTAIN IP ADDRESS");
+        return false;
+    }
+
+    // 2. Cấu hình Primary DNS (Google 8.8.8.8) và Backup DNS (Cloudflare 1.1.1.1)
+    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+    if (netif)
+    {
+        esp_netif_dns_info_t dns;
+        dns.ip.type = ESP_IPADDR_TYPE_V4;
+        dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+        esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+        dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+        esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+    }
+    ip_addr_t d1, d2;
+    d1.type = IPADDR_TYPE_V4;
+    d1.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+    dns_setserver(0, &d1);
+    d2.type = IPADDR_TYPE_V4;
+    d2.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+    dns_setserver(1, &d2);
+
+    // 3. Xác thực DNS hoạt động
+    IPAddress resolved;
+    bool dnsOk = false;
+    unsigned long t_dns = millis();
+    while (!dnsOk && millis() - t_dns < 3000)
+    {
+        if (WiFi.hostByName("74f78261a2504f078425eb1b85f3eaed.s1.eu.hivemq.cloud", resolved) == 1 ||
+            WiFi.hostByName("generativelanguage.googleapis.com", resolved) == 1)
+        {
+            dnsOk = true;
+            break;
+        }
+        delay(100);
+    }
+
+    LOG_WIFI("WIFI", "NETWORK READY: IP=%s, Gateway=%s, DNS1=%s, DNS2=%s (DNS: %s)",
+             WiFi.localIP().toString().c_str(),
+             WiFi.gatewayIP().toString().c_str(),
+             WiFi.dnsIP(0).toString().c_str(),
+             WiFi.dnsIP(1).toString().c_str(),
+             dnsOk ? "OK" : "TIMEOUT");
+
+    return true;
+}
+
+//======================================================
 // STA RUNNING
 //======================================================
 template <class Transport>
 inline void PnP<Transport>::CONFIG_STA()
 {
     webServer.stop();
+    dnsServer.stop();
     loadWiFi();
     loadMQTT();
     // =========================
@@ -463,17 +530,14 @@ inline void PnP<Transport>::CONFIG_STA()
         }
         if (WiFi.status() == WL_CONNECTED)
         {
-            unsigned long t_ip = millis();
-            while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() - t_ip < 3000)
+            if (setupAndVerifyNetwork())
             {
-                delay(50);
+                SaveWiFi(_sta_ssid, _sta_pass);
+                LOG_WIFI("WIFI", "WiFi SIGNAL STRENGTH: %s", (String(WiFi.RSSI()) + "dBm").c_str());
+                WiFi_STATE = MODE_CONNECT_MQTT;
+                delay(100);
+                return;
             }
-            SaveWiFi(_sta_ssid, _sta_pass);
-            LOG_WIFI("WIFI", "WiFi SIGNAL STRENGTH: %s", (String(WiFi.RSSI()) + "dBm").c_str());
-            // Serial.println(WiFi.RSSI());
-            WiFi_STATE = MODE_CONNECT_MQTT;
-            delay(100);
-            return;
         }
     }
     // ========================================
@@ -498,22 +562,20 @@ inline void PnP<Transport>::CONFIG_STA()
         }
         if (WiFi.status() == WL_CONNECTED)
         {
-            unsigned long t_ip = millis();
-            while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() - t_ip < 3000)
-            {
-                delay(50);
-            }
             // Lưu lại SSID hiện tại vào bộ nhớ tạm để phục vụ Reconnect sau này
             strncpy(_sta_ssid, saved_ssid[i].c_str(), sizeof(_sta_ssid) - 1);
             _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
             strncpy(_sta_pass, saved_pass[i].c_str(), sizeof(_sta_pass) - 1);
             _sta_pass[sizeof(_sta_pass) - 1] = '\0';
 
-            SaveWiFi(saved_ssid[i].c_str(), saved_pass[i].c_str());
-            LOG_WIFI("WIFI", "WiFi signal strength: %s", (String(WiFi.RSSI()) + "dBm").c_str());
-            WiFi_STATE = MODE_CONNECT_MQTT;
-            delay(100);
-            return;
+            if (setupAndVerifyNetwork())
+            {
+                SaveWiFi(saved_ssid[i].c_str(), saved_pass[i].c_str());
+                LOG_WIFI("WIFI", "WiFi signal strength: %s", (String(WiFi.RSSI()) + "dBm").c_str());
+                WiFi_STATE = MODE_CONNECT_MQTT;
+                delay(100);
+                return;
+            }
         }
     }
     // =====================================
@@ -635,16 +697,20 @@ inline void PnP<Transport>::RECONNECT_WIFI()
         return;
     }
 
-    WiFi.disconnect(false);
-    delay(100);
+    dnsServer.stop();
+    webServer.stop();
     WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
 
     // =========================
     // 1. THỬ WIFI HIỆN TẠI
     // =========================
     if (strlen(_sta_ssid) > 0)
     {
-        WiFi.begin(_sta_ssid, _sta_pass);
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            WiFi.begin(_sta_ssid, _sta_pass);
+        }
         LOG_WIFI("WIFI", "RECONNECT WIFI WITH: %s", _sta_ssid);
         unsigned long t_start = millis();
         unsigned long t_log = millis();
@@ -659,14 +725,12 @@ inline void PnP<Transport>::RECONNECT_WIFI()
         }
         if (WiFi.status() == WL_CONNECTED)
         {
-            unsigned long t_ip = millis();
-            while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() - t_ip < 3000)
+            if (setupAndVerifyNetwork())
             {
-                delay(50);
+                LOG_WIFI("WIFI", "RECONNECT WIFI DONE (IP: %s)", WiFi.localIP().toString().c_str());
+                WiFi_STATE = MODE_CONNECT_MQTT;
+                return;
             }
-            LOG_WIFI("WIFI", "RECONNECT WIFI DONE (IP: %s)", WiFi.localIP().toString().c_str());
-            WiFi_STATE = MODE_CONNECT_MQTT;
-            return;
         }
     }
 
@@ -677,8 +741,6 @@ inline void PnP<Transport>::RECONNECT_WIFI()
     {
         if (saved_ssid[i].length() == 0 || saved_ssid[i] == _sta_ssid)
             continue;
-        WiFi.disconnect(false);
-        delay(100);
         WiFi.begin(saved_ssid[i].c_str(), saved_pass[i].c_str());
         LOG_WIFI("WIFI", "RECONNECT WIFI WITH: %s", saved_ssid[i].c_str());
         unsigned long t_start = millis();
@@ -694,18 +756,16 @@ inline void PnP<Transport>::RECONNECT_WIFI()
         }
         if (WiFi.status() == WL_CONNECTED)
         {
-            unsigned long t_ip = millis();
-            while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() - t_ip < 3000)
-            {
-                delay(50);
-            }
             strncpy(_sta_ssid, saved_ssid[i].c_str(), sizeof(_sta_ssid) - 1);
             _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
             strncpy(_sta_pass, saved_pass[i].c_str(), sizeof(_sta_pass) - 1);
             _sta_pass[sizeof(_sta_pass) - 1] = '\0';
-            LOG_WIFI("WIFI", "RECONNECT WIFI DONE (IP: %s)", WiFi.localIP().toString().c_str());
-            WiFi_STATE = MODE_CONNECT_MQTT;
-            return;
+            if (setupAndVerifyNetwork())
+            {
+                LOG_WIFI("WIFI", "RECONNECT WIFI DONE (IP: %s)", WiFi.localIP().toString().c_str());
+                WiFi_STATE = MODE_CONNECT_MQTT;
+                return;
+            }
         }
     }
 
@@ -957,6 +1017,7 @@ inline void PnP<Transport>::run()
                         _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
                         strncpy(_sta_pass, targetPass, sizeof(_sta_pass) - 1);
                         _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+                        setupAndVerifyNetwork();
                         WiFi_STATE = MODE_CONNECT_MQTT;
                     }
                 }

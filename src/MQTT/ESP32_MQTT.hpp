@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <IoT/API.hpp>
 #include <IoT/Param.hpp>
+#include <lwip/dns.h>
 
 template <class MQTT>
 class AIoT_MQTT_ESP32
@@ -169,6 +170,18 @@ inline void AIoT_MQTT_ESP32<MQTT>::begin()
         return;
     }
 
+    // Đảm bảo DNS servers luôn khả dụng
+    if (WiFi.dnsIP(0) == IPAddress(0, 0, 0, 0))
+    {
+        ip_addr_t d1, d2;
+        d1.type = IPADDR_TYPE_V4;
+        d1.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+        dns_setserver(0, &d1);
+        d2.type = IPADDR_TYPE_V4;
+        d2.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+        dns_setserver(1, &d2);
+    }
+
     String MAC = WiFi.macAddress();
     strncpy(_mac, MAC.c_str(), sizeof(_mac) - 1);
     _mac[sizeof(_mac) - 1] = '\0';
@@ -198,6 +211,7 @@ inline void AIoT_MQTT_ESP32<MQTT>::begin()
         server = WiFiClientSecure();
         server.setInsecure();
         server.setTimeout(10);
+        server.setHandshakeTimeout(10);
 
         mqttClient.setClient(server);
         mqttClient.setServer(MQTT_Server, MQTT_PORT);

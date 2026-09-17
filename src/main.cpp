@@ -633,6 +633,9 @@ void handleSerialChat(float sensorValue)
                     {
                         Serial.printf("   - SSID         : %s\n", WiFi.SSID().c_str());
                         Serial.printf("   - IP Address   : %s\n", WiFi.localIP().toString().c_str());
+                        Serial.printf("   - Gateway      : %s\n", WiFi.gatewayIP().toString().c_str());
+                        Serial.printf("   - Primary DNS  : %s\n", WiFi.dnsIP(0).toString().c_str());
+                        Serial.printf("   - Secondary DNS: %s\n", WiFi.dnsIP(1).toString().c_str());
                         Serial.printf("   - Tín hiệu RSSI: %d dBm\n", WiFi.RSSI());
                     }
                     Serial.printf("   - HiveMQ MQTT  : %s\n", (serverMQTT.check_connect()) ? "CONNECTED ✅" : "DISCONNECTED ❌");

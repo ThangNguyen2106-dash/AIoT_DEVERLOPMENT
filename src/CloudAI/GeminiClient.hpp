@@ -5,6 +5,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <cJSON.h>
+#include <lwip/dns.h>
 
 namespace CloudAI
 {
@@ -51,9 +52,22 @@ namespace CloudAI
                 return "[Error]: ESP32 chưa kết nối WiFi.";
             }
 
+            // Đảm bảo DNS servers khả dụng cho kết nối HTTPS
+            if (WiFi.dnsIP(0) == IPAddress(0, 0, 0, 0))
+            {
+                ip_addr_t d1, d2;
+                d1.type = IPADDR_TYPE_V4;
+                d1.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+                dns_setserver(0, &d1);
+                d2.type = IPADDR_TYPE_V4;
+                d2.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+                dns_setserver(1, &d2);
+            }
+
             WiFiClientSecure client;
             client.setInsecure(); // Bỏ qua kiểm tra chứng chỉ SSL cho nhẹ RAM
             client.setTimeout(_timeoutMs / 1000);
+            client.setHandshakeTimeout(10);
 
             HTTPClient http;
             String url = "https://generativelanguage.googleapis.com/v1beta/models/" + _model + ":generateContent?key=" + String(_apiKey);
