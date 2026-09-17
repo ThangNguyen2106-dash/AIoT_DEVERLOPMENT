@@ -26,10 +26,14 @@
   },
   "frameworks": "arduino",
   "platforms": "espressif32",
-  "headers": [
-    "AIoT.h",
-    "TZIoT.h"
-  ],
+  "headers": "AIoT.h",
+  "build": {
+    "srcFilter": [
+      "+<*>",
+      "-<main.cpp>",
+      "-<secrets.h>"
+    ]
+  },
   "examples": "examples/*/*.ino"
 }
 
