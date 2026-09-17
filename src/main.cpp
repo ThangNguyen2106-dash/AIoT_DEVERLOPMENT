@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-// #define DEBUG_COLOR
+#define DEBUG_COLOR
 #define BUTTON_CONFIG
 
 // 1. Cấu hình phần cứng (ESP32-S3 Kit)
@@ -1086,20 +1086,25 @@ void loop()
             float scoreNow = hybridAI.edge.getDetector().predictScore(currentTemp);
             const char *stateStr = (zNow >= 3.0f) ? "CRITICAL" : ((zNow >= 1.5f) ? "WARNING" : "NORMAL");
 
+            const char *wifiStr = (WiFi.status() == WL_CONNECTED) ? "ONLINE" : "RETRYING...";
+            const char *mqttStr = (AIoT.CheckConnect() && serverMQTT.check_connect()) ? "ONLINE" : "OFFLINE";
+
             if (dhtSensor.isOk())
             {
-                Serial.printf("🌡️ [DHT11]: %.1f °C, %.1f %% | 🧠 [Edge AI]: Z=%.2fσ [%s - Score: %.2f] | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s\n",
+                Serial.printf("🌡️ [DHT11]: %.1f °C, %.1f %% | 🧠 [Edge AI]: Z=%.2fσ [%s - Score: %.2f] | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s | 📶 WiFi: %s | ☁️ MQTT: %s\n",
                               currentTemp, currentHum, zNow, stateStr, scoreNow,
                               currentPotPercent,
                               AIoT_Device.getRelay(1) ? "ON" : "OFF",
-                              AIoT_Device.getRelay(2) ? "ON" : "OFF");
+                              AIoT_Device.getRelay(2) ? "ON" : "OFF",
+                              wifiStr, mqttStr);
             }
             else
             {
-                Serial.printf("⏳ [DHT11]: Đang đọc... | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s\n",
+                Serial.printf("⏳ [DHT11]: Đang đọc... | 🎛️ [Biến trở]: %.1f %% | R1: %s | R2: %s | 📶 WiFi: %s | ☁️ MQTT: %s\n",
                               currentPotPercent,
                               AIoT_Device.getRelay(1) ? "ON" : "OFF",
-                              AIoT_Device.getRelay(2) ? "ON" : "OFF");
+                              AIoT_Device.getRelay(2) ? "ON" : "OFF",
+                              wifiStr, mqttStr);
             }
         }
     }

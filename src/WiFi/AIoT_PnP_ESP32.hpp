@@ -580,24 +580,11 @@ inline void PnP<Transport>::CONFIG_MQTT()
 template <class Transport>
 inline void PnP<Transport>::CONNECTED()
 {
-    static unsigned long lostWifiStart = 0;
     if (WiFi.status() != WL_CONNECTED)
     {
-        if (lostWifiStart == 0)
-        {
-            lostWifiStart = millis();
-        }
-        else if (millis() - lostWifiStart > 3000) // Đợi 3s debounce để ESP32 auto-reconnect tự phục hồi
-        {
-            lostWifiStart = 0;
-            LOG_ERROR("WIFI", "LOST CONNECT TO WIFI");
-            WiFi_STATE = MODE_LOST_CONNECT_WIFI;
-        }
+        LOG_ERROR("WIFI", "LOST CONNECT TO WIFI");
+        WiFi_STATE = MODE_LOST_CONNECT_WIFI;
         return;
-    }
-    else
-    {
-        lostWifiStart = 0;
     }
 
     if (serverMQTT.check_connect())
@@ -609,7 +596,7 @@ inline void PnP<Transport>::CONNECTED()
         LOG_ERROR("MQTT", "LOST CONNECT TO MQTT (state=%d)", serverMQTT.getState());
         LOG_ERROR("MQTT", "TRY RECONNECT TO MQTT");
         WiFi_STATE = MODE_LOST_CONNECT_MQTT;
-        delay(1000);
+        delay(500);
     }
 }
 
@@ -625,16 +612,26 @@ inline void PnP<Transport>::RECONNECT_WIFI()
     LOG_WIFI("WIFI", "RECONNECTING WIFI...");
 
     // Đồng bộ SSID từ bộ nhớ Flash NVS nếu biến tạm bị rỗng
-    if (strlen(_sta_ssid) == 0 && saved_ssid[0].length() > 0)
+    if (strlen(_sta_ssid) == 0)
     {
-        strncpy(_sta_ssid, saved_ssid[0].c_str(), sizeof(_sta_ssid) - 1);
-        _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
-        strncpy(_sta_pass, saved_pass[0].c_str(), sizeof(_sta_pass) - 1);
-        _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+        loadWiFi();
+        if (saved_ssid[0].length() > 0)
+        {
+            strncpy(_sta_ssid, saved_ssid[0].c_str(), sizeof(_sta_ssid) - 1);
+            _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+            strncpy(_sta_pass, saved_pass[0].c_str(), sizeof(_sta_pass) - 1);
+            _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+        }
     }
 
-    // KHÔNG dùng WiFi.disconnect(true) vì sẽ ngắt hẳn RF radio (esp_wifi_stop)
-    // Dùng WiFi.disconnect(false) để hủy kết nối cũ nhưng giữ radio sẵn sàng
+    // Nếu không có bất kỳ SSID nào được cấu hình -> Chuyển sang AP để người dùng cấu hình
+    if (strlen(_sta_ssid) == 0 && saved_ssid[0].length() == 0)
+    {
+        LOG_ERROR("WIFI", "NO SAVED WIFI FOUND! SWITCHING TO AP MODE...");
+        WiFi_STATE = MODE_STARTUP_AP;
+        return;
+    }
+
     WiFi.disconnect(false);
     delay(100);
     WiFi.mode(WIFI_STA);
@@ -770,46 +767,27 @@ inline void PnP<Transport>::RECONNECT_MQTT()
 template <class Transport>
 inline void PnP<Transport>::FAILD_MQTT()
 {
-    static bool startedmqtt = false;
-    if (!startedmqtt)
+    static unsigned long lastMqttRetry = 0;
+    if (lastMqttRetry == 0)
     {
-        startedmqtt = true;
-        loadMQTT();
-        LOG_MQTT("MQTT", "PLEASE CHECK OR CONFIG MQTT ON WEBSITE.....");
-        mqttClient.disconnect();
-        dnsServer.stop();
-        webServer.on("/", HTTP_GET, [this]()
-                     { webServer.send(200, "text/html", WebUI::MQTTConfigPage(WiFi.SSID(), _mqtt_username, _mqtt_pass)); });
-        webServer.on("/save", HTTP_POST, [this]()
-                     { startedmqtt = false;
-                        this->handleSaveMQTT(); });
-        webServer.begin();
-
-        bool hasValidIP = (WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0));
-        if (hasValidIP)
-        {
-            LOG_MQTT("MQTT", "OPEN http://%s TO CHECK OR CONFIG MQTT", WiFi.localIP().toString().c_str());
-        }
-        else
-        {
-            WiFi.mode(WIFI_AP_STA);
-            IPAddress local_ip;
-            local_ip.fromString(_ap_ip);
-            WiFi.softAPConfig(local_ip, local_ip, WIFI_AP_Subnet);
-            WiFi.softAP(_ap_ssid, _ap_pass);
-            dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
-            dnsServer.start(53, "*", local_ip);
-            LOG_MQTT("MQTT", "OPEN http://%s (AP: %s) TO CHECK OR CONFIG MQTT", _ap_ip, _ap_ssid);
-        }
+        lastMqttRetry = millis();
     }
-    webServer.handleClient();
-    dnsServer.processNextRequest();
-    if (serverMQTT.check_connect())
+
+    // Nếu Wi-Fi bị mất trong lúc này -> Chuyển ngay sang chế độ phục hồi Wi-Fi
+    if (WiFi.status() != WL_CONNECTED)
     {
-        startedmqtt = false;
-        webServer.stop();
-        LOG_MQTT("MQTT", "MQTT RECONNECTED");
-        WiFi_STATE = MODE_CONNECTED;
+        lastMqttRetry = 0;
+        LOG_ERROR("MQTT", "WIFI LOST WHILE RECOVERING MQTT -> SWITCH TO WIFI RECOVERY");
+        WiFi_STATE = MODE_LOST_CONNECT_WIFI;
+        return;
+    }
+
+    // Nếu Wi-Fi vẫn còn nhưng MQTT rớt, tự động thử lại sau mỗi 5 giây
+    if (millis() - lastMqttRetry >= 5000)
+    {
+        lastMqttRetry = 0;
+        LOG_MQTT("MQTT", "RETRYING MQTT CONNECTION...");
+        WiFi_STATE = MODE_LOST_CONNECT_MQTT;
     }
 }
 
@@ -953,6 +931,7 @@ inline void PnP<Transport>::run()
             if (millis() - lastAPRetry > 15000)
             {
                 lastAPRetry = millis();
+                loadWiFi();
                 bool hasKnown = (strlen(_sta_ssid) > 0) || (saved_ssid[0].length() > 0);
                 if (hasKnown)
                 {
@@ -961,8 +940,10 @@ inline void PnP<Transport>::run()
                     LOG_WIFI("AP", "CHECKING IF KNOWN WIFI '%s' IS BACK ONLINE...", targetSSID);
                     WiFi.begin(targetSSID, targetPass);
                     unsigned long checkStart = millis();
-                    while (WiFi.status() != WL_CONNECTED && millis() - checkStart < 3000)
+                    while (WiFi.status() != WL_CONNECTED && millis() - checkStart < 8000)
                     {
+                        dnsServer.processNextRequest();
+                        webServer.handleClient();
                         delay(50);
                     }
                     if (WiFi.status() == WL_CONNECTED)
@@ -972,6 +953,10 @@ inline void PnP<Transport>::run()
                         dnsServer.stop();
                         WiFi.softAPdisconnect(true);
                         WiFi.mode(WIFI_STA);
+                        strncpy(_sta_ssid, targetSSID, sizeof(_sta_ssid) - 1);
+                        _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+                        strncpy(_sta_pass, targetPass, sizeof(_sta_pass) - 1);
+                        _sta_pass[sizeof(_sta_pass) - 1] = '\0';
                         WiFi_STATE = MODE_CONNECT_MQTT;
                     }
                 }
