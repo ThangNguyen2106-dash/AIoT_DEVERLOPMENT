@@ -18,3 +18,8 @@ Thumbs.db
 # Local secrets
 *secrets.h
 src/secrets.h
+
+# Python
+__pycache__/
+*.py[cod]
+
