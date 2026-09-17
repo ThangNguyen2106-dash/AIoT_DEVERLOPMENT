@@ -4,25 +4,51 @@
 #define BOARD_NAME "ESP32-S3 AIoT DevKit"
 
 // LED & Buzzer
+#ifndef PIN_STATUS_LED
 #define PIN_STATUS_LED   2
+#endif
+#ifndef PIN_RGB_LED
 #define PIN_RGB_LED      48 // WS2812 RGB LED trên ESP32-S3
+#endif
+#ifndef PIN_BUZZER
 #define PIN_BUZZER       21
+#endif
 
-// Relays / Actuators
-#define PIN_RELAY_1      4
-#define PIN_RELAY_2      5
-#define PIN_RELAY_3      6
-#define PIN_RELAY_4      7
+// Relays / Actuators (Chân mặc định chuẩn cho Kit ESP32-S3 AIoT)
+#ifndef PIN_RELAY_1
+#define PIN_RELAY_1      14 // Relay 1 (Tải chính / Quạt)
+#endif
+#ifndef PIN_RELAY_2
+#define PIN_RELAY_2      15 // Relay 2 (Tải phụ / Máy bơm / Van)
+#endif
+#ifndef PIN_RELAY_3
+#define PIN_RELAY_3      -1
+#endif
+#ifndef PIN_RELAY_4
+#define PIN_RELAY_4      -1
+#endif
 
 // Buttons
+#ifndef PIN_BUTTON_USER
 #define PIN_BUTTON_USER  0
+#endif
+#ifndef PIN_BUTTON_CONFIG
 #define PIN_BUTTON_CONFIG 0
+#endif
 
 // Sensors / Analog (ADC1 trên ESP32-S3)
-#define PIN_ANALOG_1     1
-#define PIN_ANALOG_2     2
-#define PIN_ANALOG_3     3
-#define PIN_ANALOG_4     8
+#ifndef PIN_ANALOG_1
+#define PIN_ANALOG_1     6  // Cảm biến biến trở (ADC1_CH5)
+#endif
+#ifndef PIN_ANALOG_2
+#define PIN_ANALOG_2     1
+#endif
+#ifndef PIN_ANALOG_3
+#define PIN_ANALOG_3     2
+#endif
+#ifndef PIN_ANALOG_4
+#define PIN_ANALOG_4     3
+#endif
 
 // I2C Bus
 #define PIN_I2C_SDA      8
