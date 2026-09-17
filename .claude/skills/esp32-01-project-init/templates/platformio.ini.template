@@ -1,0 +1,12 @@
+[env]
+platform = espressif32@6.9.0     ; luôn ghim phiên bản, không để mặc định trôi
+framework = espidf
+monitor_speed = 115200
+monitor_filters = esp32_exception_decoder, time
+build_flags = -Wall -Wextra -Werror=return-type
+
+[env:esp32s3]
+board = esp32-s3-devkitc-1
+
+[env:esp32c3]
+board = esp32-c3-devkitm-1
