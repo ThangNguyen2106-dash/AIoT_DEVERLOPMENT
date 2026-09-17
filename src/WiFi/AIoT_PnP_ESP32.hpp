@@ -549,7 +549,8 @@ inline void PnP<Transport>::CONFIG_MQTT()
     {
         LOG_ERROR("WIFI", "LOST CONNECT TO WIFI");
         WiFi_STATE = MODE_LOST_CONNECT_WIFI;
-        delay(1000);
+        delay(500);
+        return;
     }
     if (serverMQTT.check_connect())
     {
@@ -568,12 +569,14 @@ inline void PnP<Transport>::CONFIG_MQTT()
         }
         SaveMQTT(mqttusername, mqttpass);
         WiFi_STATE = MODE_CONNECTED;
-        delay(1000);
+        delay(500);
+        return;
     }
-    if (!serverMQTT.check_connect())
+    else
     {
         WiFi_STATE = MODE_FAILD_CONNECT_MQTT;
-        delay(1000);
+        delay(500);
+        return;
     }
 }
 
@@ -726,24 +729,21 @@ inline void PnP<Transport>::RECONNECT_MQTT()
         WiFi_STATE = MODE_LOST_CONNECT_WIFI;
         return;
     }
+
     // =========================
-    // RESET MQTT STATE
+    // CẤU HÌNH TÀI KHOẢN NẾU CÓ
     // =========================
-    serverMQTT.disconnect();
-    delay(100);
-    serverMQTT.begin();
-    LOG_MQTT("MQTT", "TRY RECONNECT MQTT...");
-    unsigned long t_start = millis();
-    unsigned long t_log = millis();
-    while (!serverMQTT.check_connect() && millis() - t_start < 8000)
+    if (strlen(_mqtt_username) > 0)
     {
-        if (millis() - t_log > 1000)
-        {
-            LOG_MQTT("MQTT", "RECONNECTING... %ds", (millis() - t_start) / 1000);
-            t_log = millis();
-        }
-        delay(50);
+        serverMQTT.config(_mqtt_username, _mqtt_pass);
     }
+    else
+    {
+        serverMQTT.config(mqttusername, mqttpass);
+    }
+
+    serverMQTT.begin();
+
     // =========================
     // SUCCESS
     // =========================

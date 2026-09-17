@@ -150,16 +150,20 @@ inline bool AIoT_MQTT_ESP32<MQTT>::check_connect()
 template <class MQTT>
 inline void AIoT_MQTT_ESP32<MQTT>::disconnect()
 {
-    snprintf(MQTT_BASE_TOPIC, sizeof(MQTT_BASE_TOPIC), "%s%s", BASE_TOPIC, _mac);
-    this->UnsubscribeTopic(MQTT_BASE_TOPIC, SUB_PREFIX_CONTROL_TOPIC);
-    mqttClient.disconnect();
-    delay(100);
+    if (mqttClient.connected())
+    {
+        snprintf(MQTT_BASE_TOPIC, sizeof(MQTT_BASE_TOPIC), "%s%s", BASE_TOPIC, _mac);
+        this->UnsubscribeTopic(MQTT_BASE_TOPIC, SUB_PREFIX_CONTROL_TOPIC);
+        mqttClient.disconnect();
+    }
+    server.stop();
+    delay(50);
 }
 
 template <class MQTT>
 inline void AIoT_MQTT_ESP32<MQTT>::begin()
 {
-    if (WiFi.status() != WL_CONNECTED)
+    if (WiFi.status() != WL_CONNECTED || WiFi.localIP() == IPAddress(0, 0, 0, 0))
     {
         Time_connect_MQTT = 0;
         return;
@@ -170,43 +174,58 @@ inline void AIoT_MQTT_ESP32<MQTT>::begin()
     _mac[sizeof(_mac) - 1] = '\0';
 
     Time_connect_MQTT = millis();
-    server.stop();
     disconnect();
     vTaskDelay(pdMS_TO_TICKS(100));
 
-    // Cấu hình kết nối bảo mật TLS/SSL cho HiveMQ Cloud port 8883
-    server.setInsecure(); // Bỏ qua xác thực chứng chỉ CA
-    mqttClient.setServer(MQTT_Server, MQTT_PORT);
-    mqttClient.setBufferSize(512); // Đảm bảo buffer đủ chứa JSON telemetry
-    mqttClient.setKeepAlive(60);
-    mqttClient.setSocketTimeout(15);
-    mqttClient.setCallback(AIoT_Callback);
-
-    char clientId[32];
-    snprintf(clientId, sizeof(clientId), "ESP32_%08X", (uint32_t)ESP.getEfuseMac());
+    // Dynamic Client ID: thêm suffix ngẫu nhiên theo thời gian để tránh xung đột session cũ trên HiveMQ Cloud
+    char clientId[40];
+    snprintf(clientId, sizeof(clientId), "ESP32_%08X_%04X", (uint32_t)ESP.getEfuseMac(), (uint16_t)(millis() & 0xFFFF));
 
     LOG_MQTT("MQTT", "CONNECTING TO HIVEMQ CLOUD (%s:%d)...", MQTT_Server, MQTT_PORT);
     LOG_MQTT("MQTT", "CLIENT ID: %s | USER: %s", clientId, MQTT_USERNAME);
-    while (WiFi.status() == WL_CONNECTED && !mqttClient.connected() && (millis() - Time_connect_MQTT <= Timeout_MQTT))
-    {
-        // HiveMQ Cloud bắt buộc phải có Client ID (không được để chuỗi rỗng)
-        bool connected = mqttClient.connect(clientId, MQTT_USERNAME, MQTT_PASS);
 
+    const int maxAttempts = 3;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++)
+    {
+        if (WiFi.status() != WL_CONNECTED)
+        {
+            LOG_ERROR("MQTT", "WIFI LOST DURING MQTT CONNECT ATTEMPT");
+            return;
+        }
+
+        // Tái tạo hoàn toàn SSL socket để giải phóng mbedTLS session context cũ
+        server.stop();
+        server = WiFiClientSecure();
+        server.setInsecure();
+        server.setTimeout(10);
+
+        mqttClient.setClient(server);
+        mqttClient.setServer(MQTT_Server, MQTT_PORT);
+        mqttClient.setBufferSize(512);
+        mqttClient.setKeepAlive(60);
+        mqttClient.setSocketTimeout(10);
+        mqttClient.setCallback(AIoT_Callback);
+
+        bool connected = mqttClient.connect(clientId, MQTT_USERNAME, MQTT_PASS);
         if (connected)
         {
             snprintf(MQTT_BASE_TOPIC, sizeof(MQTT_BASE_TOPIC), "%s%s", BASE_TOPIC, _mac);
-            // ESP32 chỉ subscribe topic control để nhận lệnh từ Cloud (không tự subscribe telemetry để tránh echo loop)
             this->SubscribeTopic(MQTT_BASE_TOPIC, SUB_PREFIX_CONTROL_TOPIC);
             LOG_MQTT("MQTT", "CONNECTED TO HIVEMQ CLOUD SUCCESSFULLY!");
             return;
         }
-        LOG_MQTT("MQTT", "TRYING TO CONNECT... (state=%d)", mqttClient.state());
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        LOG_MQTT("MQTT", "CONNECT ATTEMPT %d/%d FAILED (rc=%d)", attempt, maxAttempts, mqttClient.state());
+        server.stop();
+        if (attempt < maxAttempts)
+        {
+            vTaskDelay(pdMS_TO_TICKS(1500));
+        }
     }
+
     if (!mqttClient.connected())
     {
-        LOG_ERROR("MQTT", "CONNECT TIMEOUT OR FAILED, rc=%d", mqttClient.state());
+        LOG_ERROR("MQTT", "ALL CONNECT ATTEMPTS FAILED, rc=%d", mqttClient.state());
     }
 }
 
