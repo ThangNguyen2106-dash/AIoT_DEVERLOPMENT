@@ -67,3 +67,4 @@ void loop()
     Serial.printf("[LOOP] Toggle Quat: %s\n", AIoT_Device.Relay(PIN_FAN_RELAY) ? "ON" : "OFF");
     delay(3000);
 }
+

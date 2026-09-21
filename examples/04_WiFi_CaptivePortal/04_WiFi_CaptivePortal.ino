@@ -40,3 +40,4 @@ void loop()
     // Duy trì Web Server cấu hình và dịch vụ DNS Captive Portal
     AIoT.run();
 }
+
