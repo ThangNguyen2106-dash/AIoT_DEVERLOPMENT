@@ -24,6 +24,7 @@
     "type": "git",
     "url": "https://github.com/ThangNguyen2106-dash/AIoT_DEVERLOPMENT.git"
   },
+  "license": "GPL-3.0-or-later",
   "frameworks": "arduino",
   "platforms": "espressif32",
   "headers": "AIoT.h",

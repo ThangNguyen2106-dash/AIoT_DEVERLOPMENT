@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Security-TLS%2FSSL%20Port%208883-green?style=for-the-badge&logo=letsencrypt" alt="TLS Security" />
   <img src="https://img.shields.io/badge/Edge%20AI-TinyML%20%7C%20Welford%20O(1)-red?style=for-the-badge&logo=tensorflow" alt="Edge AI" />
   <img src="https://img.shields.io/badge/Cloud%20AI-Google%20Gemini%20Flash-purple?style=for-the-badge&logo=google" alt="AI Ready" />
-  <img src="https://img.shields.io/badge/License-MIT-brightgreen?style=for-the-badge" alt="License" />
+  <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License" />
 </p>
 
 ---
@@ -274,4 +274,9 @@ const char *GEMINI_API_KEY = "AIzaSy_YOUR_GOOGLE_GEMINI_API_KEY";
 
 ## 7. Tác Quyền & Giấy Phép (License)
 
-Dự án được phát triển bởi **Thắng Nguyễn** và phát hành dưới giấy phép **MIT License**. Bạn có toàn quyền sử dụng, tùy biến và tích hợp vào các dự án nghiên cứu cũng như sản phẩm thương mại thực tế.
+Dự án được phát triển bởi **Thắng Nguyễn** và phát hành dưới giấy phép **GNU General Public License v3.0 (GPLv3)**.
+
+Theo các điều khoản của giấy phép GPLv3:
+- Mọi người có quyền tự do sử dụng, nghiên cứu, sửa đổi và chia sẻ mã nguồn phần mềm này.
+- Khi phân phối hoặc phát hành các sản phẩm phái sinh từ AIoT_LIB, mã nguồn của các sửa đổi/sản phẩm đó bắt buộc phải được công khai dưới cùng giấy phép GPLv3.
+- Chi tiết toàn văn giấy phép xem tại file [LICENSE](LICENSE).
