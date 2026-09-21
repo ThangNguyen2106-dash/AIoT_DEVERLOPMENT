@@ -1,82 +1,56 @@
 /**
  * ============================================================================
- * AIoT_LIB - Ví Dụ 01: Cơ Bản Về IoT & Đồng Bộ Dữ Liệu Lên Cloud
+ * AIoT_LIB - Ví Dụ 01: Điều Khiển IoT Cơ Bản (Basic IoT & Remote Control)
  * ============================================================================
- * Mô tả:
- * - Kết nối WiFi tự động (hoặc qua Smart Captive Portal Web AP: 192.168.21.6)
- * - Độc lập phần cứng: Định nghĩa chân Relay động qua AIoT_Device.Relay(pin, "Tên")
- * - Lắng nghe sự kiện điều khiển từ xa qua macro Virtual_WRITE
- * - Đóng gói và gửi Telemetry (nhiệt độ chip, RAM, RSSI, uptime) lên HiveMQ Cloud TLS
+ * Chức năng:
+ * - Kết nối WiFi & Broker HiveMQ Cloud TLS (Cổng 8883)
+ * - Lắng nghe sự kiện điều khiển từ xa từ Web Dashboard / App qua macro Virtual_WRITE
+ * - Bật / Tắt rơ-le và gửi phản hồi xác nhận trạng thái về Cloud
+ * ============================================================================
  */
 
 #include <Arduino.h>
 #include <AIoT.h>
 
-// Thông tin mạng WiFi (để trống nếu muốn cấu hình qua Web AP 192.168.21.6)
+// Thông tin kết nối WiFi
 const char *WIFI_SSID = "YOUR_WIFI_SSID";
 const char *WIFI_PASS = "YOUR_WIFI_PASS";
 
-// Thông tin tài khoản HiveMQ Cloud TLS (Port 8883)
+// Tài khoản HiveMQ Cloud TLS (Port 8883)
 const char *MQTT_USER = "IoT_TEST";
 const char *MQTT_PASS = "mt21062005";
 
-// Định nghĩa chân Relay linh hoạt theo bo mạch của bạn
-#define PIN_RELAY_MAIN 14
+// Chân GPIO điều khiển Rơ-le (tùy chỉnh theo bo mạch thực tế của bạn)
+#define PIN_RELAY1 14
 
-// Bắt sự kiện điều khiển từ xa từ App/Dashboard
+// Lắng nghe sự kiện điều khiển từ xa với định danh "relay1"
 Virtual_WRITE(relay1)
 {
-    int state = param.getInt();
-    // Điều khiển Relay chân động
-    AIoT_Device.Relay(PIN_RELAY_MAIN, state ? true : false);
-    Serial.printf("[MQTT RECV] Dieu khien Relay: %d\n", state);
+    int state = param.getInt(); // Nhận giá trị 1 (BẬT) hoặc 0 (TẮT)
+    AIoT_Device.Relay(PIN_RELAY1, state ? true : false);
 
-    // Xác nhận phản hồi trạng thái ngược lại Server
+    Serial.printf("[MQTT RECV] Relay 1 da chuyen sang: %s\n", state ? "BAT" : "TAT");
+
+    // Xác nhận trạng thái đã thực thi thành công về Server
     AIoT.writeControl("relay1", state);
-}
-
-// Gửi Telemetry định kỳ mỗi 3 giây
-void sendTelemetryData()
-{
-    if (!AIoT.CheckConnect())
-        return;
-
-    float chipTemp = AIoT_Device.readChipTemp();
-    uint32_t freeRam = AIoT_Device.readFreeRam();
-    int8_t wifiRssi = WiFi.RSSI();
-    unsigned long uptime = millis() / 1000;
-
-    Serial.printf("[TELEMETRY] Temp: %.2f *C | RAM: %u B | RSSI: %d dBm | Uptime: %lu s\n",
-                  chipTemp, freeRam, wifiRssi, uptime);
-
-    AIoT.updateTelemetry("chip_temp", chipTemp);
-    AIoT.updateTelemetry("free_ram", (int)freeRam);
-    AIoT.updateTelemetry("wifi_rssi", wifiRssi);
-    AIoT.updateTelemetry("uptime", (int)uptime);
-    AIoT.updateTelemetry("relay_state", (int)AIoT_Device.Relay(PIN_RELAY_MAIN));
-
-    // Đóng gói JSON và gửi lên Broker trong 1 gói tin duy nhất
-    AIoT.sendTelemetry();
 }
 
 void setup()
 {
     Serial.begin(115200);
+    delay(1000);
 
-    // Đăng ký chân Relay và nhãn nhận diện thiết bị
-    AIoT_Device.Relay(PIN_RELAY_MAIN, "Tai cong nghiep 1");
+    Serial.println("\n=== AIoT_LIB: Vi Du 01 - Dieu Khien IoT Co Ban ===");
 
-    // Khởi tạo kết nối mạng và HiveMQ Cloud TLS
+    // Đăng ký chân Rơ-le với nhãn hiển thị
+    AIoT_Device.Relay(PIN_RELAY1, "Rơ-le 1");
+
+    // Khởi động kết nối WiFi và HiveMQ Cloud
     AIoT.begin(WIFI_SSID, WIFI_PASS, MQTT_USER, MQTT_PASS);
-
-    // Hẹn giờ gửi dữ liệu telemetry mỗi 3000ms
-    AIoT.addTimeEvent(3000, sendTelemetryData);
-
-    Serial.println("[SYSTEM] He thong AIoT Basic khoi dong thanh cong.");
 }
 
 void loop()
 {
-    // BẮT BUỘC: Giữ kết nối MQTT, Web Captive Portal và xử lý Event Timer
+    // Duy trì kết nối mạng và xử lý sự kiện (bắt buộc gọi trong loop)
     AIoT.run();
 }

@@ -403,8 +403,6 @@ void processUserMessage(String userText)
     String reply = "";
     if (WiFi.status() == WL_CONNECTED && hybridAI.gemini.hasApiKey())
     {
-        Serial.println("[AI]: Đang kết nối và suy luận từ Google Gemini...");
-
         // Gửi trực tiếp nội dung người dùng hỏi tới Gemini, hoàn toàn không kèm dữ liệu cảm biến ngầm
         reply = hybridAI.gemini.ask(userText, AI_SYSTEM_PROMPT);
 

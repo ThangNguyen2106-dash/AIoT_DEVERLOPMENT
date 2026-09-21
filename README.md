@@ -139,41 +139,41 @@ flowchart TD
 
 ## 4. Hướng Dẫn Các Ví Dụ Mẫu Theo Từng Tầng (Layer-by-Layer Examples Guide)
 
-Tất cả 10 ví dụ trong thư mục `examples/` được phân bổ tương ứng với 4 tầng kiến trúc:
+Tất cả 10 ví dụ trong thư mục `examples/` được chuẩn hóa theo chuẩn Arduino/PlatformIO (`examples/<Name>/<Name>.ino`), mã nguồn ngắn gọn (30-60 dòng) và tập trung đúng một chức năng trọng tâm:
 
-### Ví Dụ Tầng 1: IoT & Điều Khiển Phần Cứng
+### Ví Dụ Tầng 1: IoT Core & Quản Lý Phần Cứng
 
 #### 1. Ví dụ `01_Basic_IoT`
-- **Mục tiêu**: Làm quen với vòng đời chương trình `AIoT`, kết nối WiFi, Broker MQTT HiveMQ Cloud TLS (Port 8883) và nhận lệnh từ Dashboard.
-- **Điểm sáng**: Lắng nghe sự kiện điều khiển từ xa qua macro `Virtual_WRITE(relay1)` và gửi phản hồi trạng thái ngược lại Server bằng `AIoT.writeControl()`.
-- **Ứng dụng**: Nền tảng cho các thiết bị điều khiển từ xa qua Internet.
+- **Mục tiêu**: Làm quen với vòng đời chương trình `AIoT`, kết nối WiFi, Broker MQTT HiveMQ Cloud TLS (Port 8883).
+- **Điểm sáng**: Lắng nghe sự kiện điều khiển từ xa qua macro `Virtual_WRITE(relay1)` và gửi phản hồi xác nhận trạng thái ngược lại Server bằng `AIoT.writeControl()`.
+- **Ứng dụng**: Nền tảng điều khiển thiết bị, đóng ngắt rơ-le từ xa qua Internet.
 
-#### 2. Ví dụ `01_Telemetry_Stream`
-- **Mục tiêu**: Thu thập các chỉ số vận hành (Nhiệt độ chip, RAM trống, cường độ sóng WiFi RSSI, thời gian hoạt động) và gửi lên Cloud.
-- **Điểm sáng**: Đóng gói nhiều trường thông số vào một gói tin JSON duy nhất bằng `AIoT.sendTelemetry()` giúp tiết kiệm tối đa băng thông mạng.
+#### 2. Ví dụ `02_Telemetry_Stream`
+- **Mục tiêu**: Thu thập các chỉ số vận hành hệ thống (Nhiệt độ chip, RAM trống, cường độ sóng WiFi RSSI, thời gian hoạt động uptime).
+- **Điểm sáng**: Đóng gói nhiều trường thông số vào một gói tin JSON duy nhất bằng `AIoT.sendTelemetry()` giúp tối ưu hóa băng thông mạng.
 - **Ứng dụng**: Thu thập dữ liệu đo đạc định kỳ cho các hệ thống giám sát.
 
-#### 3. Ví dụ `02_Device_Control`
-- **Mục tiêu**: Điều khiển toàn bộ cơ cấu chấp hành theo phong cách hướng đối tượng.
-- **Điểm sáng**: Cú pháp OOP ngắn gọn `AIoT_Device.Relay(14).on()`, `AIoT_Device.rgb(0, 255, 0)`, `AIoT_Device.beep(100)`, và hàm `AIoT_Device.getHardwarePrompt()` tự sinh mô tả phần cứng cho AI.
-- **Ứng dụng**: Quản lý nhiều relay, van điện từ và đèn báo trạng thái trong tủ điện.
+#### 3. Ví dụ `03_Device_Control`
+- **Mục tiêu**: Điều khiển toàn bộ cơ cấu chấp hành phần cứng độc lập mạng theo phong cách hướng đối tượng (OOP).
+- **Điểm sáng**: Cú pháp OOP trực quan `AIoT_Device.Relay(14).on()`, `.off()`, toán tử gán `=`, đổi màu đèn `AIoT_Device.rgb()`, còi `AIoT_Device.beep()`, và hàm `AIoT_Device.getHardwarePrompt()` tự sinh mô tả phần cứng cho AI.
+- **Ứng dụng**: Kiểm tra và làm chủ tầng phần cứng HAL trước khi tích hợp mạng.
 
-#### 4. Ví dụ `03_WiFi_CaptivePortal`
-- **Mục tiêu**: Cấu hình mạng tiện lợi không cần máy tính hay dây cáp nạp code.
-- **Điểm sáng**: Khi mất WiFi, bo mạch tự phát Access Point `AIoT_WiFi` tại IP `192.168.21.6`. Giao diện Web Responsive hỗ trợ quét WiFi và lưu cấu hình vĩnh viễn vào bộ nhớ Flash (NVS).
+#### 4. Ví dụ `04_WiFi_CaptivePortal`
+- **Mục tiêu**: Cấu hình mạng WiFi thông minh không cần máy tính hay dây cáp nạp code.
+- **Điểm sáng**: Khi chưa có cấu hình mạng, bo mạch tự phát Access Point `AIoT_WiFi` tại IP `192.168.21.6`. Giao diện Web Responsive hỗ trợ quét WiFi và lưu cấu hình vĩnh viễn vào bộ nhớ Flash (NVS Preferences).
 - **Ứng dụng**: Thiết bị thương mại bàn giao cho người dùng cuối tự cài đặt.
 
 ---
 
 ### Ví Dụ Tầng 2: Toán Học Nhúng & AI Tại Biên
 
-#### 5. Ví dụ `02_AI_Math_Academic`
-- **Mục tiêu**: Cung cấp bộ công cụ điện toán toán học thuần túy chạy trực tiếp trên chip ESP32 (Zero-Dependency).
-- **Điểm sáng**: Hỗ trợ đầy đủ `Statistics` (Mean, StdDev, RMS, MinMax), `WelfordEstimator` trực tuyến, bộ lọc số `SlidingWindow`, `MovingAverageFilter`, `LowPassFilter`, biến đổi `FastFourierTransform` (FFT) và thuật toán phân loại `OnlineKNN`.
+#### 5. Ví dụ `05_AI_Math_Academic`
+- **Mục tiêu**: Bộ công cụ điện toán toán học thuần C++ chạy trực tiếp trên chip ESP32 (Zero-Dependency).
+- **Điểm sáng**: Hỗ trợ đầy đủ `Statistics` (Mean, StdDev, RMS), giải thuật `WelfordEstimator` cập nhật trực tuyến $O(1)$ RAM, biến đổi `FastFourierTransform` (FFT) phân tích phổ tần số và thuật toán phân loại máy học `OnlineKNN`.
 - **Ứng dụng**: Nghiên cứu học thuật, xử lý tín hiệu âm thanh và phân tích chuỗi thời gian (time-series).
 
-#### 6. Ví dụ `03_Edge_AI_Anomaly`
-- **Mục tiêu**: Tự động học đường cơ sở (Baseline Auto-Calibration) của thiết bị và phát hiện sự cố khẩn cấp (kẹt trục, ngắn mạch, rung lắc mạnh).
+#### 6. Ví dụ `06_Edge_AI_Anomaly`
+- **Mục tiêu**: Tự động học đường cơ sở (Baseline Auto-Calibration) của thiết bị và phát hiện sự cố khẩn cấp.
 - **Điểm sáng**: Tính toán Z-Score cực nhanh. Nếu phát hiện nguy cấp, vi điều khiển **ngắt Relay động cơ ngay lập tức trong vòng dưới 1ms** mà hoàn toàn không phụ thuộc vào mạng Internet.
 - **Ứng dụng**: Bảo vệ khẩn cấp cho máy CNC, động cơ băng tải công nghiệp.
 
@@ -181,31 +181,32 @@ Tất cả 10 ví dụ trong thư mục `examples/` được phân bổ tương 
 
 ### Ví Dụ Tầng 3: Trí Tuệ Đám Mây & Function Calling
 
-#### 7. Ví dụ `04_Cloud_AI_Gemini`
+#### 7. Ví dụ `07_Cloud_AI_Gemini`
 - **Mục tiêu**: Tích hợp Google Gemini REST API qua HTTPS để phân tích tình huống và điều khiển phần cứng bằng tiếng Việt.
-- **Điểm sáng**: Cơ chế Tag Injection `[CMD:RELAY:14:ON]`. AI sinh thẻ lệnh trong câu trả lời, và hàm `AIoT_Device.executeCommand(response)` tự động phân giải để kích hoạt chân GPIO tương ứng.
-- **Ứng dụng**: Trợ lý ảo đàm thoại, thiết bị nhà thông minh tương tác tự nhiên.
+- **Điểm sáng**: Cơ chế Tag Injection an toàn `[CMD:RELAY:14:ON]`. AI sinh thẻ lệnh trong câu trả lời, và hàm `AIoT_Device.executeCommand(response)` tự động phân giải để kích hoạt chân GPIO tương ứng.
+- **Ứng dụng**: Trợ lý ảo đàm thoại, thiết bị nhà thông minh tương tác ngôn ngữ tự nhiên.
 
 ---
 
-### Ví Dụ Tầng 4: Hệ Thống Lai Toàn Diện
+### Ví Dụ Tầng 4: Hệ Thống Lai Toàn Diện & Giao Tiếp Công Nghiệp
 
-#### 8. Ví dụ `05_Hybrid_AI_Industrial`
+#### 8. Ví dụ `08_Hybrid_AI_Industrial`
 - **Mục tiêu**: Ứng dụng công nghiệp giám sát động cơ hoàn chỉnh kết hợp Edge AI, MQTT Telemetry và Google Gemini.
 - **Điểm sáng**:
   - Tầng 1: Edge AI giám sát rung chấn liên tục, ngắt Relay trong 0.1ms nếu rung giật nguy hiểm.
-  - Tầng 2: Đồng bộ chỉ số thống kê (Mean, RMS, Z-Score) lên HiveMQ Cloud qua MQTT TLS 8883.
-  - Tầng 3: Tự động gọi Gemini phân tích nguyên nhân gốc khi phát hiện sự cố.
+  - Tầng 2: Đồng bộ chỉ số thống kê (Vibration, Motor state) lên HiveMQ Cloud qua MQTT TLS 8883.
+  - Tầng 3: Tự động gọi Gemini phân tích nguyên nhân gốc rễ khi phát hiện sự cố.
 - **Ứng dụng**: Hệ thống bảo trì dự đoán (PdM) cho nhà máy sản xuất.
 
-#### 9. Ví dụ `06_Hybrid_AI_Orchestrator`
+#### 9. Ví dụ `09_Hybrid_AI_Orchestrator`
 - **Mục tiêu**: Điều phối luồng công việc thông minh dựa trên chính sách `PolicyEngine`.
 - **Điểm sáng**: Thực thi chính sách Edge-First (xử lý tối đa tại biên để tiết kiệm chi phí gọi Cloud) và chỉ kích hoạt Cloud AI khi gặp tình huống phức tạp vượt ngưỡng.
 - **Ứng dụng**: Tối ưu hóa chi phí API và băng thông cho các dự án IoT quy mô lớn.
 
-#### 10. Ví dụ `04_Full_Features`
-- **Mục tiêu**: Dự án khung (Boilerplate) tích hợp toàn diện mọi tính năng của thư viện trong một mã nguồn duy nhất.
-- **Ứng dụng**: Bản mẫu khởi đầu để phát triển các sản phẩm thương mại hoàn chỉnh.
+#### 10. Ví dụ `10_RS485_Modbus`
+- **Mục tiêu**: Giao tiếp chuẩn công nghiệp RS485 Modbus RTU qua cổng Serial phần cứng.
+- **Điểm sáng**: Khởi tạo Modbus RTU Master, đọc thanh ghi Holding Registers từ các cảm biến công nghiệp (đo nhiệt độ, độ ẩm, điện năng).
+- **Ứng dụng**: Tích hợp đồng hồ đo điện đa năng (PZEM-004T, Schneider...), cảm biến môi trường công nghiệp.
 
 ---
 
