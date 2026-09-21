@@ -121,20 +121,20 @@ def ask_gemini_rest(prompt, api_key, model="gemini-3.5-flash-lite"):
 # =============================================================================
 def test_cloud_ai():
     print("=================================================================")
-    print("      🧠 KHỞI TẠO VÀ KIỂM THỬ TRÍ TUỆ NHÂN TẠO CLOUD AI          ")
+    print("      KHOI TAO VA KIEM THU TRI TUE NHAN TAO CLOUD AI            ")
     print("=================================================================")
 
     api_key = get_gemini_api_key()
     if not api_key:
-        print("\n❌ LỖI: Chưa tìm thấy GEMINI_API_KEY!")
-        print("👉 Vui lòng mở file src/main.cpp và điền API Key vào dòng:")
+        print("\n[ERROR] Chua tim thay GEMINI_API_KEY!")
+        print(" - Vui long mo file src/main.cpp va dien API Key vao dong:")
         print('   const char *GEMINI_API_KEY = "AIzaSy...";')
-        print("   hoặc đặt biến môi trường: set GEMINI_API_KEY=AIzaSy...")
+        print("   hoac dat bien moi truong: set GEMINI_API_KEY=AIzaSy...")
         return
 
-    print(f"[*] Sử dụng API Key: {api_key[:6]}...{api_key[-4:]}")
-    print("[*] Đang kết nối tới mô hình: gemini-3.5-flash-lite...")
-    print("[*] Đã nạp thành công bộ Tri thức chuyên sâu ISO 10816-3 & Action Protocol!\n")
+    print(f"[*] Su dung API Key: {api_key[:6]}...{api_key[-4:]}")
+    print("[*] Dang ket noi toi mo hinh: gemini-3.5-flash-lite...")
+    print("[*] Da nap thanh cong bo Tri thuc chuyen sau ISO 10816-3 & Action Protocol!\n")
 
     test_queries = [
         "Động cơ đang chạy với độ rung RMS = 1.6 mm/s, nhiệt độ 41 C. Đánh giá trạng thái giúp tôi.",
@@ -143,9 +143,9 @@ def test_cloud_ai():
     ]
 
     for q in test_queries:
-        print(f"\n👤 [NGƯỜI DÙNG HỎI]: {q}")
+        print(f"\n[USER_QUERY]: {q}")
         reply = ask_gemini_rest(q, api_key)
-        print(f"🤖 [CLOUD AI ĐÃ ĐƯỢC DẠY TRẢ LỜI]:\n{reply}")
+        print(f"[CLOUD_AI_RESPONSE]:\n{reply}")
         print("-" * 65)
 
 if __name__ == "__main__":

@@ -59,10 +59,10 @@ void sendChipTelemetry()
     unsigned long uptimeSec = millis() / 1000; // Thời gian chạy (giây)
 
     Serial.println("\n--- [TELEMETRY UPDATE] ---");
-    Serial.printf("🌡️ Nhiet do chip ESP32: %.2f *C\n", chipTemp);
-    Serial.printf("💾 RAM trong (Free Heap): %u bytes\n", freeRam);
-    Serial.printf("📶 Tin hieu WiFi (RSSI): %d dBm\n", wifiRssi);
-    Serial.printf("⏱️ Thoi gian hoat dong: %lu s\n", uptimeSec);
+    Serial.printf("[SYSTEM] Nhiet do chip ESP32: %.2f *C\n", chipTemp);
+    Serial.printf("[SYSTEM] RAM trong (Free Heap): %u bytes\n", freeRam);
+    Serial.printf("[SYSTEM] Tin hieu WiFi (RSSI): %d dBm\n", wifiRssi);
+    Serial.printf("[SYSTEM] Thoi gian hoat dong: %lu s\n", uptimeSec);
     Serial.println("--------------------------");
 
     // 3. Đóng gói & gửi lên Topic: device/<MAC>/telemetry

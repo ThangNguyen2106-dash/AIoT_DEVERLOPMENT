@@ -84,7 +84,7 @@ def get_sample_data():
 # =============================================================================
 def train_tinyml():
     print("=================================================================")
-    print("      🚀 KHỞI ĐỘNG QUÁ TRÌNH DẠY (HUẤN LUYỆN) EDGE AI           ")
+    print("      KHOI DONG QUA TRINH HUAN LUYEN (TRAINING) EDGE AI         ")
     print("=================================================================")
     
     samples = get_sample_data()
@@ -200,9 +200,9 @@ namespace EdgeModels
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(header_content)
         
-    print(f"✅ ĐÃ XUẤT THÀNH CÔNG FILE C++ HEADER:")
-    print(f"👉 File: {os.path.abspath(output_path)}")
-    print("👉 Bạn có thể nạp vào ESP32 để Edge AI phân loại cực nhanh (< 1ms)!")
+    print(f"[SUCCESS] Exported C++ Header successfully:")
+    print(f" - Path: {os.path.abspath(output_path)}")
+    print(" - Model ready for on-chip ESP32 TinyML neural inference (< 1ms).")
 
 if __name__ == "__main__":
     train_tinyml()

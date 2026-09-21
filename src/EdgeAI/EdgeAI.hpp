@@ -12,6 +12,7 @@ namespace EdgeAI
     {
         float score;           // Điểm số bất thường [0.0, 1.0]
         DeviceState state;     // Trạng thái: STATE_NORMAL, STATE_WARNING, STATE_CRITICAL
+        bool isAnomaly;        // Có bất thường hay không (true nếu WARNING hoặc CRITICAL)
         bool isEmergency;      // Cần xử lý khẩn cấp tại chỗ (ngắt rơ-le)
         const char *label;     // Chuỗi trạng thái ("NORMAL", "WARNING", "CRITICAL")
         float zScore;          // Độ lệch chuẩn Z-Score tức thời
@@ -19,12 +20,13 @@ namespace EdgeAI
         float rms;             // Năng lượng hiệu dụng
         float stdDev;          // Độ lệch chuẩn cửa sổ trượt
         const char *reason;    // Nguyên nhân dị thường ("Ổn định", "Lệch Z-Score", "Sốc nhiệt", "Rung lắc P2P")
+        TinyMLResult neural;   // Kết quả phân loại mạng nơ-ron TinyML (Lớp, Xác suất Softmax, Thời gian suy luận µs)
     };
 
     class Engine
     {
     public:
-        Engine() : _slidingWindow(), _detector(), _classifier(), _anomalyStreak(0), _lastSample(0.0f) {}
+        Engine() : _slidingWindow(), _detector(), _classifier(), _neuralClassifier(), _anomalyStreak(0), _lastSample(0.0f) {}
 
         void begin(float zThreshold = 3.0f, uint32_t calibrationSamples = 30)
         {
@@ -149,9 +151,13 @@ namespace EdgeAI
                 state = STATE_WARNING;
             }
 
+            float featureVector[4] = {meanVal, rmsVal, p2pVal, stdDevVal};
+            TinyMLResult neuralRes = _neuralClassifier.predict(featureVector, 4);
+
             InferenceResult res;
             res.score = score;
             res.state = state;
+            res.isAnomaly = (state != STATE_NORMAL);
             res.isEmergency = (state == STATE_CRITICAL);
             res.label = stateToString(state);
             res.zScore = currentZ;
@@ -159,6 +165,7 @@ namespace EdgeAI
             res.rms = rmsVal;
             res.stdDev = stdDevVal;
             res.reason = reason;
+            res.neural = neuralRes;
             return res;
         }
 
@@ -210,11 +217,14 @@ namespace EdgeAI
 
         AnomalyDetector &getDetector() { return _detector; }
         DeviceStateClassifier &getClassifier() { return _classifier; }
+        TinyMLNeuralClassifier &getNeuralClassifier() { return _neuralClassifier; }
+        const TinyMLNeuralClassifier &getNeuralClassifier() const { return _neuralClassifier; }
 
     private:
         AI_Math::SlidingWindow<64> _slidingWindow;
         AnomalyDetector _detector;
         DeviceStateClassifier _classifier;
+        TinyMLNeuralClassifier _neuralClassifier;
         int _anomalyStreak;
         float _lastSample;
     };

@@ -83,6 +83,10 @@ namespace EdgeAI
             return (s < 1.2f) ? 1.2f : s;
         }
 
+        // Tương thích ngược với các ví dụ và hàm gọi trực tiếp
+        float getMean() const { return getBaselineMean(); }
+        float getStdDev() const { return getBaselineStdDev(); }
+
         float getZScore(float value) const
         {
             return _welford.computeZScore(value, 1.2f);

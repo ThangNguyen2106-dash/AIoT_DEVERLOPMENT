@@ -3,5 +3,6 @@
 
 #include <WiFi.h>
 #include <IoT/Protocol.hpp>
+#include <HybridAI/HybridAI.h>
 
 #endif
