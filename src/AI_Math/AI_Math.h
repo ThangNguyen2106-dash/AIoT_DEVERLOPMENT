@@ -11,6 +11,6 @@
 
 #include "SignalPreprocessing.hpp"
 #include "FeatureExtraction.hpp"
-#include "ModelExcution.hpp"
+#include "ModelExecution.hpp"
 
 #endif /* AI_MATH_H */
