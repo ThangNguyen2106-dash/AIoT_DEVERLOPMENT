@@ -13,7 +13,7 @@ namespace CloudAI
     {
     public:
         GeminiClient(const char *apiKey = "", const char *model = "gemini-3.5-flash-lite")
-            : _model(model), _timeoutMs(15000)
+            : _model(model), _timeoutMs(25000)
         {
             setApiKey(apiKey);
         }
@@ -67,13 +67,14 @@ namespace CloudAI
             WiFiClientSecure client;
             client.setInsecure(); // Bỏ qua kiểm tra chứng chỉ SSL cho nhẹ RAM
             client.setTimeout(_timeoutMs / 1000);
-            client.setHandshakeTimeout(10);
+            client.setHandshakeTimeout(15);
 
             HTTPClient http;
             String url = "https://generativelanguage.googleapis.com/v1beta/models/" + _model + ":generateContent?key=" + String(_apiKey);
 
             if (!http.begin(client, url))
             {
+                client.stop();
                 return "[Error]: Không thể khởi tạo kết nối HTTPS tới Gemini.";
             }
 
@@ -150,10 +151,18 @@ namespace CloudAI
             }
             else
             {
-                reply = "[HTTP " + String(httpCode) + " Error]: " + http.getString();
+                if (httpCode < 0)
+                {
+                    reply = "[HTTP " + String(httpCode) + " Error]: " + http.errorToString(httpCode);
+                }
+                else
+                {
+                    reply = "[HTTP " + String(httpCode) + " Error]: " + http.getString();
+                }
             }
 
             http.end();
+            client.stop();
             return reply;
         }
 

@@ -28,8 +28,7 @@ namespace CloudAI
                         "  \"status\": \"NORMAL\" | \"WARNING\" | \"CRITICAL\",\n"
                         "  \"analysis\": \"<concise explanation>\",\n"
                         "  \"actions\": {\n"
-                        "    \"relay1\": 0 | 1,\n"
-                        "    \"relay2\": 0 | 1\n"
+                        "    \"<actuator_or_target>\": <recommended_state_or_value>\n"
                         "  }\n"
                         "}\n");
             return prompt;

@@ -3,174 +3,104 @@
 
 #include <Arduino.h>
 #include <AI_Math/AI_Math.h>
-#include "AnomalyDetector.hpp"
-#include "Classifier.hpp"
 
 namespace EdgeAI
 {
-    struct InferenceResult
+    // =========================================================================
+    // CẤU TRÚC VECTOR ĐẶC TRƯNG SAU KHI ĐÃ CHUẨN HÓA (FEATURE VECTOR)
+    // -------------------------------------------------------------------------
+    // Mặc định nén 4 chiều: [0]: Mean, [1]: RMS, [2]: Peak-to-Peak, [3]: StdDev
+    // Dữ liệu đã được chuẩn hóa về dải [0.0, 1.0] hoặc chuẩn hóa Z-Score.
+    // =========================================================================
+    struct FeatureVector
     {
-        float score;           // Điểm số bất thường [0.0, 1.0]
-        DeviceState state;     // Trạng thái: STATE_NORMAL, STATE_WARNING, STATE_CRITICAL
-        bool isAnomaly;        // Có bất thường hay không (true nếu WARNING hoặc CRITICAL)
-        bool isEmergency;      // Cần xử lý khẩn cấp tại chỗ (ngắt rơ-le)
-        const char *label;     // Chuỗi trạng thái ("NORMAL", "WARNING", "CRITICAL")
-        float zScore;          // Độ lệch chuẩn Z-Score tức thời
-        float p2p;             // Biên độ rung lắc đỉnh-đáy (Peak-to-Peak)
-        float rms;             // Năng lượng hiệu dụng
-        float stdDev;          // Độ lệch chuẩn cửa sổ trượt
-        const char *reason;    // Nguyên nhân dị thường ("Ổn định", "Lệch Z-Score", "Sốc nhiệt", "Rung lắc P2P")
-        TinyMLResult neural;   // Kết quả phân loại mạng nơ-ron TinyML (Lớp, Xác suất Softmax, Thời gian suy luận µs)
+        static constexpr size_t NUM_FEATURES = 4;
+        float values[NUM_FEATURES];
+
+        FeatureVector()
+        {
+            for (size_t i = 0; i < NUM_FEATURES; i++)
+            {
+                values[i] = 0.0f;
+            }
+        }
+
+        FeatureVector(float m, float r, float p, float s)
+        {
+            values[0] = m;
+            values[1] = r;
+            values[2] = p;
+            values[3] = s;
+        }
+
+        float mean() const { return values[0]; }
+        float rms() const { return values[1]; }
+        float p2p() const { return values[2]; }
+        float stdDev() const { return values[3]; }
+
+        const float *data() const { return values; }
+        float *data() { return values; }
+        size_t size() const { return NUM_FEATURES; }
+
+        float operator[](size_t idx) const { return (idx < NUM_FEATURES) ? values[idx] : 0.0f; }
+        float &operator[](size_t idx) { return values[idx]; }
     };
 
+    // Cấu hình dải chuẩn hóa Min-Max cho các đặc trưng
+    struct NormalizationConfig
+    {
+        float minVals[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        float maxVals[4] = {100.0f, 100.0f, 50.0f, 25.0f};
+    };
+
+    // =========================================================================
+    // EDGE AI ENGINE: THU THẬP TÍN HIỆU & XUẤT VECTOR ĐẶC TRƯNG CHUẨN HÓA
+    // =========================================================================
     class Engine
     {
     public:
-        Engine() : _slidingWindow(), _detector(), _classifier(), _neuralClassifier(), _anomalyStreak(0), _lastSample(0.0f) {}
+        Engine() : _slidingWindow() {}
 
-        void begin(float zThreshold = 3.0f, uint32_t calibrationSamples = 30)
-        {
-            calibrate(calibrationSamples, zThreshold);
-        }
-
-        // ======================================================
-        // CÁC HÀM DẠY CHO EDGE AI (TRỰC QUAN & DỄ HIỂU TRONG CODE):
-        // ======================================================
-
-        // 1. DẠY BẰNG MỐC CHUẨN (Nominal Value + Tolerance):
-        // Dùng khi bạn đã biết thông số thiết kế mạch/môi trường (Ví dụ: 28°C ± 1.5°C)
-        // Hệ thống sẽ sẵn sàng giám sát ngay lập tức, không cần chờ gom mẫu.
-        void teachBaseline(float nominalMean, float toleranceStdDev = 1.2f)
-        {
-            _detector.teachBaseline(nominalMean, toleranceStdDev);
-            _slidingWindow.clear();
-            _anomalyStreak = 0;
-            _lastSample = nominalMean;
-        }
-
-        // 2. DẠY BẰNG TẬP MẪU THỰC NGHIỆM (Golden Samples Array):
-        // Dùng khi bạn đo thử nghiệm vài mẫu lúc máy chạy êm và nạp thẳng vào code:
-        // float golden[] = {27.8, 28.2, 28.0, 27.9}; engine.train(golden, 4);
-        void train(const float *samples, size_t count)
-        {
-            _detector.train(samples, count);
-            _slidingWindow.clear();
-            _anomalyStreak = 0;
-            if (count > 0 && samples != nullptr)
-            {
-                _lastSample = samples[count - 1];
-            }
-        }
-
-        // 3. DẠY TỰ ĐỘNG THU THẬP TẠI CHỖ (Auto Calibration / Tare):
-        // Tự gom N mẫu từ cảm biến lúc khởi động để học đường cơ sở môi trường.
-        void autoLearn(uint32_t calibrationSamples = 30, float zThreshold = 3.0f)
-        {
-            calibrate(calibrationSamples, zThreshold);
-        }
-
-        void calibrate(uint32_t calibrationSamples = 30, float zThreshold = 3.0f)
-        {
-            _detector.calibrate(calibrationSamples, zThreshold);
-            _slidingWindow.clear();
-            _anomalyStreak = 0;
-            _lastSample = 0.0f;
-        }
-
-        // 4. DẠY MẪU CHUẨN TRỰC TIẾP LÚC CHẠY (Online Teaching):
-        // Khi máy đổi chế độ tải hoặc bạn xác nhận giá trị hiện tại là an toàn:
-        void teachNormal(float sample)
-        {
-            _detector.learn(sample);
-        }
-
-        // 3. ĐIỀU CHỈNH ĐỘ NHẠY (Sensitivity Tuning):
-        // 2.2f: Nhạy cao (High) - Cảnh báo rất sớm
-        // 3.0f: Tiêu chuẩn (Medium) - Chuẩn 3-sigma công nghiệp
-        // 3.8f: Thấp (Low) - Chống báo động giả tối đa trong môi trường nhiều nhiễu
-        void setSensitivity(float zThreshold)
-        {
-            _detector.setThreshold(zThreshold);
-        }
-
-        // Đưa một mẫu cảm biến vào và thực thi suy luận tại chỗ (tích hợp Z-Score, Động học & Lọc nhiễu)
-        InferenceResult process(float sample)
+        // Đẩy 1 mẫu tín hiệu mới vào cửa sổ trượt
+        void push(float sample)
         {
             _slidingWindow.push(sample);
-
-            bool isAnomalyRaw = false;
-            float score = _detector.processSample(sample, isAnomalyRaw);
-            float currentZ = _detector.getZScore(sample);
-
-            float meanVal = 0, rmsVal = 0, p2pVal = 0, stdDevVal = 0;
-            extractFeatures(meanVal, rmsVal, p2pVal, stdDevVal);
-
-            float tempDelta = (_lastSample > 0.0f) ? fabsf(sample - _lastSample) : 0.0f;
-            _lastSample = sample;
-
-            // Nhận diện đa hình thái dị thường:
-            bool isZScoreCritical = (currentZ >= _detector.getThreshold());
-            bool isDynamicShock = (tempDelta >= 4.0f && currentZ >= 2.0f);
-            bool isThermalInstability = (p2pVal >= 6.0f && stdDevVal >= 2.0f && currentZ >= 1.8f);
-
-            bool isAnomaly = (isZScoreCritical || isDynamicShock || isThermalInstability);
-
-            const char *reason = "Ổn định bình thường";
-            if (isDynamicShock)
-                reason = "Sốc nhiệt đột ngột (Thermal Shock)";
-            else if (isThermalInstability)
-                reason = "Rung lắc nhiệt độ dữ dội (Instability)";
-            else if (isZScoreCritical)
-                reason = "Đột biến lệch chuẩn (Z-Score Critical)";
-            else if (currentZ >= 1.5f)
-                reason = "Chớm lệch baseline (Warning)";
-
-            // Bộ lọc chống nhiễu / chống xung nhảy số đơn lẻ (yêu cầu 2 mẫu liên tiếp)
-            bool isRealCritical = false;
-            if (isAnomaly)
-            {
-                _anomalyStreak++;
-                if (_anomalyStreak >= 2)
-                {
-                    isRealCritical = true;
-                }
-            }
-            else
-            {
-                if (_anomalyStreak > 0)
-                    _anomalyStreak--;
-            }
-
-            DeviceState state = STATE_NORMAL;
-            if (isRealCritical)
-            {
-                state = STATE_CRITICAL;
-            }
-            else if (currentZ >= 1.5f || isAnomaly || _anomalyStreak == 1)
-            {
-                state = STATE_WARNING;
-            }
-
-            float featureVector[4] = {meanVal, rmsVal, p2pVal, stdDevVal};
-            TinyMLResult neuralRes = _neuralClassifier.predict(featureVector, 4);
-
-            InferenceResult res;
-            res.score = score;
-            res.state = state;
-            res.isAnomaly = (state != STATE_NORMAL);
-            res.isEmergency = (state == STATE_CRITICAL);
-            res.label = stateToString(state);
-            res.zScore = currentZ;
-            res.p2p = p2pVal;
-            res.rms = rmsVal;
-            res.stdDev = stdDevVal;
-            res.reason = reason;
-            res.neural = neuralRes;
-            return res;
         }
 
-        // Trích xuất vector đặc trưng từ cửa sổ mẫu hiện tại
-        void extractFeatures(float &meanVal, float &rmsVal, float &p2pVal, float &stdDevVal) const
+        void clear()
+        {
+            _slidingWindow.clear();
+        }
+
+        size_t sampleCount() const
+        {
+            return _slidingWindow.size();
+        }
+
+        bool isReady() const
+        {
+            return _slidingWindow.size() >= 4;
+        }
+
+        void setNormalizationConfig(const NormalizationConfig &config)
+        {
+            _config = config;
+        }
+
+        void setMinMaxRanges(const float *minVals, const float *maxVals)
+        {
+            if (minVals != nullptr && maxVals != nullptr)
+            {
+                for (size_t i = 0; i < 4; i++)
+                {
+                    _config.minVals[i] = minVals[i];
+                    _config.maxVals[i] = maxVals[i];
+                }
+            }
+        }
+
+        // Trích xuất 4 đặc trưng thô: Mean, RMS, Peak-to-Peak, StdDev
+        void extractRawFeatures(float &meanVal, float &rmsVal, float &p2pVal, float &stdDevVal) const
         {
             size_t n = _slidingWindow.size();
             if (n == 0)
@@ -182,53 +112,37 @@ namespace EdgeAI
             size_t count = (n > 64) ? 64 : n;
             _slidingWindow.toArray(data);
 
-            meanVal = AI_Math::Statistics::mean(data, count);
-            rmsVal = AI_Math::Statistics::rms(data, count);
-            p2pVal = AI_Math::Statistics::peakToPeak(data, count);
-            stdDevVal = AI_Math::Statistics::stdDev(data, count);
+            meanVal = AI_Math::FeatureExtraction::mean(data, count);
+            rmsVal = AI_Math::FeatureExtraction::rms(data, count);
+            p2pVal = AI_Math::FeatureExtraction::peakToPeak(data, count);
+            stdDevVal = AI_Math::FeatureExtraction::stdDev(data, count);
         }
 
-        // Suy luận mô hình nơ-ron tổng quát: Cho phép nạp bất kỳ ma trận trọng số W, b của người dùng
-        int predict(const float *features, const float *W, const float *b, size_t numClasses, size_t numFeatures, float &confidenceOut) const
+        // Trích xuất vector đặc trưng sau khi đã chuẩn hóa (Min-Max Scaling [0.0, 1.0])
+        FeatureVector extractNormalizedVector() const
         {
-            if (numClasses == 0 || numFeatures == 0 || W == nullptr || b == nullptr || features == nullptr)
-            {
-                confidenceOut = 0.0f;
-                return -1;
-            }
+            float rawMean = 0, rawRMS = 0, rawP2P = 0, rawStdDev = 0;
+            extractRawFeatures(rawMean, rawRMS, rawP2P, rawStdDev);
 
-            float logits[16];
-            size_t classes = (numClasses > 16) ? 16 : numClasses;
-
-            AI_Math::Matrix::denseForward(W, features, b, logits, classes, numFeatures);
-            AI_Math::Activations::softmax(logits, classes);
-            size_t bestClass = AI_Math::Activations::argmax(logits, classes);
-            confidenceOut = logits[bestClass];
-            return (int)bestClass;
+            FeatureVector vec;
+            vec.values[0] = AI_Math::FeatureExtraction::minMaxScale(rawMean, _config.minVals[0], _config.maxVals[0]);
+            vec.values[1] = AI_Math::FeatureExtraction::minMaxScale(rawRMS, _config.minVals[1], _config.maxVals[1]);
+            vec.values[2] = AI_Math::FeatureExtraction::minMaxScale(rawP2P, _config.minVals[2], _config.maxVals[2]);
+            vec.values[3] = AI_Math::FeatureExtraction::minMaxScale(rawStdDev, _config.minVals[3], _config.maxVals[3]);
+            return vec;
         }
 
-        // Suy luận với các đặc trưng tự động trích xuất từ cửa sổ trượt
-        int predict(const float *W, const float *b, size_t numClasses, size_t numFeatures, float &confidenceOut) const
+        // Đẩy mẫu tín hiệu và trả về vector sau khi đã chuẩn hóa
+        FeatureVector process(float sample)
         {
-            float feat[4];
-            extractFeatures(feat[0], feat[1], feat[2], feat[3]);
-            return predict(feat, W, b, numClasses, (numFeatures < 4) ? numFeatures : 4, confidenceOut);
+            push(sample);
+            return extractNormalizedVector();
         }
-
-        AnomalyDetector &getDetector() { return _detector; }
-        DeviceStateClassifier &getClassifier() { return _classifier; }
-        TinyMLNeuralClassifier &getNeuralClassifier() { return _neuralClassifier; }
-        const TinyMLNeuralClassifier &getNeuralClassifier() const { return _neuralClassifier; }
 
     private:
         AI_Math::SlidingWindow<64> _slidingWindow;
-        AnomalyDetector _detector;
-        DeviceStateClassifier _classifier;
-        TinyMLNeuralClassifier _neuralClassifier;
-        int _anomalyStreak;
-        float _lastSample;
+        NormalizationConfig _config;
     };
 }
 
 #endif /* EDGE_AI_HPP */
-
