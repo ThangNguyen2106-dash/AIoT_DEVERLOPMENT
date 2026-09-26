@@ -1,219 +1,82 @@
+#define DEBUG_COLOR // Bật log màu ANSI trên Serial Monitor (bỏ dòng này khi nạp bản sản xuất)
 #include <Arduino.h>
 #include <AIoT.h>
-#include <LittleFS.h>
 
-// Định nghĩa cấu trúc Vector đầu vào cho phòng học theo kiến trúc nối đuôi (Concatenation)
-#define NUM_SENSORS 4                                    // 4 cảm biến: Nhiệt độ, Độ ẩm, Ánh sáng, Áp suất
-#define FEATURES_PER_SENSOR 4                            // 4 chỉ số thống kê: Mean, RMS, P2P, StdDev
-#define TOTAL_INPUTS (NUM_SENSORS * FEATURES_PER_SENSOR) // 16 đặc trưng đầu vào
-#define NUM_OUTPUTS 3                                    // 3 trạng thái đầu ra (Ví dụ: Bình thường, Quá đông, Sự cố)
-
-constexpr uint32_t N_INITIAL_SAMPLES = 1000; // Số mẫu lấy ban đầu nếu Flash trống
-uint32_t sampleCounter = 0;
-bool isSystemTrained = false;
-
-// Đóng gói toàn bộ Não bộ vào một Struct phẳng để ghi Flash siêu tốc
-struct AI_Model_Storage
-{
-    uint32_t magicNumber; // Mã nhận diện file hợp lệ (0x41496F54 - "AIoT")
-    uint32_t version;     // Phiên bản bộ trọng số
-
-    float weights[NUM_OUTPUTS * TOTAL_INPUTS]; // 3 * 16 = 48 trọng số (Ma trận W)
-    float bias[NUM_OUTPUTS];                   // 3 số định thiên (Mảng b)
-
-    float normalCentroids[TOTAL_INPUTS]; // 16 mốc tham chiếu trạng thái bình thường
-    float minRanges[TOTAL_INPUTS];       // 16 giá trị Min để chuẩn hóa
-    float maxRanges[TOTAL_INPUTS];       // 16 giá trị Max để chuẩn hóa
+// ==============================================================================
+// 1. TRỌNG SỐ MÔ HÌNH NƠ-RON & THAM SỐ CHUẨN HÓA (Xuất từ Google Colab / Python)
+// ==============================================================================
+// Giả sử mô hình có:
+// - 4 đặc trưng đầu vào: [Mean, RMS, P2P, StdDev]
+// - 2 nhãn phân loại: [0: Bình thường (Normal), 1: Sự cố / Bất thường (Anomaly)]
+const float W[8] = {
+    0.12f, 0.45f, 0.67f, 0.23f, // Trọng số cho Nhãn 0
+    0.85f, 0.91f, 0.74f, 0.62f  // Trọng số cho Nhãn 1
 };
+const float b[2] = {0.05f, -0.10f}; // Bias định thiên
 
-AI_Model_Storage currentModel; // Biến toàn cục chứa mô hình đang chạy trên RAM
+// Dải giá trị Min - Max của 4 đặc trưng dùng để chuẩn hóa về [0.0, 1.0]
+const float minVals[4] = {10.0f, 5.0f, 0.0f, 0.0f};
+const float maxVals[4] = {80.0f, 60.0f, 40.0f, 15.0f};
 
-// ================= GIAI ĐOẠN 1: QUẢN LÝ BỘ NHỚ FLASH (LittleFS) =================
-
-void saveModelToFlash()
-{
-    File file = LittleFS.open("/model.bin", "w");
-    if (!file)
-    {
-        Serial.println(F("[ESP32-S3] LỖI: Không thể mở Flash để ghi!"));
-        return;
-    }
-    // Ghi nguyên khối nhị phân 112 bytes từ RAM xuống Flash chỉ trong 1 lệnh
-    file.write((uint8_t *)&currentModel, sizeof(AI_Model_Storage));
-    file.close();
-    Serial.println(F("[ESP32-S3] Đã lưu bộ trọng số mới vào Flash thành công!"));
-}
-
-bool loadModelFromFlash()
-{
-    if (!LittleFS.exists("/model.bin"))
-    {
-        return false; // File chưa tồn tại (Hệ thống mới tinh)
-    }
-
-    File file = LittleFS.open("/model.bin", "r");
-    if (!file)
-        return false;
-
-    file.read((uint8_t *)&currentModel, sizeof(AI_Model_Storage));
-    file.close();
-
-    // Kiểm tra magic number xem file có hợp lệ không
-    if (currentModel.magicNumber == 0x41496F54)
-    {
-        return true;
-    }
-    return false;
-}
-
-// ================= GIAI ĐOẠN 2: LẮNG NGHE CẬP NHẬT TỪ CỬA SỔ PYTHON =================
-
-void checkSerialForNewWeights()
-{
-    if (Serial.available() > 0)
-    {
-        String msg = Serial.readStringUntil('\n');
-        msg.trim();
-
-        // Nhận lệnh cập nhật từng ô trọng số từ GUI Python: UPDATE_W,vị_trí,giá_trị
-        if (msg.startsWith("UPDATE_W,"))
-        {
-            int firstComma = msg.indexOf(',');
-            int secondComma = msg.indexOf(',', firstComma + 1);
-
-            int index = msg.substring(firstComma + 1, secondComma).toInt();
-            float newWeight = msg.substring(secondComma + 1).toFloat();
-
-            if (index >= 0 && index < (NUM_OUTPUTS * TOTAL_INPUTS))
-            {
-                currentModel.weights[index] = newWeight; // Đè nóng vào RAM
-            }
-        }
-        // Nhận lệnh chốt hạ từ GUI Python: SAVE_MODEL
-        else if (msg.equals("SAVE_MODEL"))
-        {
-            currentModel.version++; // Tăng phiên bản não bộ
-            saveModelToFlash();     // Khóa cứng vào Flash vĩnh viễn
-
-            // Phản hồi ngược lại để hiển thị trực tiếp lên màn hình đen của GUI Python
-            Serial.println("THÔNG BÁO: ĐÃ LƯU CỨNG NÃO BỘ VÀO FLASH THÀNH CÔNG!");
-        }
-    }
-}
-
-// ================= GIAI ĐOẠN 3: LUỒNG CHẠY CHÍNH (MAIN PIPELINE) =================
-
+// ==============================================================================
+// 2. SETUP: KHỞI TẠO HỆ THỐNG
+// ==============================================================================
 void setup()
 {
     Serial.begin(115200);
 
-    if (!LittleFS.begin(true))
-    { // Tự động format Flash nếu LittleFS lỗi
-        Serial.println(F("[ESP32-S3] Lỗi khởi động hệ thống tệp!"));
-        return;
-    }
+    // [A] Khởi tạo thiết bị ngoại vi (Device HAL)
+    AIoT.device.begin();
+    AIoT.device.attachRelay(14, "Warning_Relay"); // Rơ-le cảnh báo trên GPIO 14
 
-    // Kiểm tra "Não bộ" trong Flash
-    if (loadModelFromFlash())
-    {
-        Serial.println(F("[ESP32-S3] -> Đã tìm thấy bộ não cũ trong Flash. Hệ thống sẵn sàng hoạt động!"));
-        isSystemTrained = true;
-    }
-    else
-    {
-        Serial.println(F("[ESP32-S3] WARNING: CHƯA CÓ TRỌNG SỐ BAN ĐẦU!"));
-        Serial.println(F("[ESP32-S3] Hệ thống tự động chuyển sang chế độ lấy mẫu N lần..."));
-        isSystemTrained = false;
-        sampleCounter = 0;
+    // [B] Khởi tạo Edge AI Pipeline (Chỉ cần 3 dòng lệnh)
+    AIoT.edgeAI.begin(16);                          // Cửa sổ trượt lấy 16 mẫu trước khi suy luận
+    AIoT.edgeAI.setModel(W, b, 4, 2);               // 4 đầu vào, 2 nhãn đầu ra
+    AIoT.edgeAI.setNormalization(minVals, maxVals); // Cài đặt chuẩn hóa Min-Max
 
-        // Khởi tạo dải Min-Max biên độ mặc định để chuẩn bị lưu vết
-        for (int i = 0; i < TOTAL_INPUTS; i++)
-        {
-            currentModel.minRanges[i] = 9999.0f;
-            currentModel.maxRanges[i] = -9999.0f;
-        }
-    }
+    // (Tùy chọn) Tinh chỉnh độ nhạy lọc nhiễu Kalman nếu cần
+    // AIoT.edgeAI.setFilter(0.01f, 0.1f);
 }
 
+// ==============================================================================
+// 3. LOOP: THU THẬP TÍN HIỆU & SUY LUẬN TỰ ĐỘNG
+// ==============================================================================
 void loop()
 {
-    // TRƯỜNG HỢP A: HỆ THỐNG MỚI TINH - ĐANG TỰ ĐỘNG LẤY MẪU KHỞI TẠO N LẦN
-    if (!isSystemTrained)
+    // Duy trì kết nối mạng WiFi PnP & MQTT
+    AIoT.run();
+
+    // BƯỚC 1: Đọc cảm biến thô (ví dụ: analog ADC chân 34 hoặc từ I2C/SPI)
+    float rawSensor = analogRead(34);
+
+    // BƯỚC 2: Đẩy trực tiếp vào pipeline
+    // (Hàm push() sẽ tự động lọc nhiễu Kalman và nạp vào bộ đệm vòng)
+    AIoT.edgeAI.push(rawSensor);
+
+    // BƯỚC 3: Kiểm tra khi bộ đệm đã tích lũy đủ 16 mẫu của cửa sổ trượt
+    if (AIoT.edgeAI.isReady())
     {
-        if (sampleCounter < N_INITIAL_SAMPLES)
+        // Thực thi toàn bộ chuỗi: Trích xuất 4 đặc trưng -> Chuẩn hóa -> Suy luận mạng nơ-ron
+        size_t label = AIoT.edgeAI.predict();
+
+        // In bảng tóm tắt kết quả (Nhãn chiến thắng, độ tự tin %, thời gian tính toán us)
+        AIoT.edgeAI.printSummary();
+
+        // BƯỚC 4: Ra quyết định điều khiển phần cứng tại chỗ (Zero Latency)
+        if (label == 1) // Phát hiện trạng thái Bất thường
         {
-
-            // Giả lập đọc dữ liệu thô từ các cảm biến phòng học của bạn
-            float raw_temp = random(2000, 3500) / 100.0f; // 20.00°C -> 35.00°C
-
-            // Bạn có thể nhúng thư viện `FeatureExtraction.hpp` vào đây để tính toán
-            // Giả lập cập nhật dải Min-Max cho Đặc trưng ô số 0 (Mean của Nhiệt độ)
-            if (raw_temp < currentModel.minRanges[0])
-                currentModel.minRanges[0] = raw_temp;
-            if (raw_temp > currentModel.maxRanges[0])
-                currentModel.maxRanges[0] = raw_temp;
-
-            // In tiến độ ra Serial, cửa sổ GUI Python sẽ bắt dòng này và hiển thị cho người dùng xem
-            if (sampleCounter % 100 == 0)
-            {
-                Serial.printf("TIẾN ĐỘ LẤY MẪU KHỞI TẠO: %d / %d\n", sampleCounter, N_INITIAL_SAMPLES);
-            }
-
-            sampleCounter++;
-            delay(10); // Giãn cách lấy mẫu nền
+            AIoT.device.Relay(14).on(); // Bật rơ-le kích hoạt còi/quạt
         }
-        else
+        else // Trạng thái Bình thường
         {
-            // Sau khi đã gom đủ N mẫu nền, tự động cấu hình bộ khung sơ cấp
-            currentModel.magicNumber = 0x41496F54; // Gán mã hợp lệ vĩnh viễn
-            currentModel.version = 1;
-
-            // Gán ma trận trọng số W và bias b mặc định ban đầu (Sẽ được Python đè lại sau)
-            for (int i = 0; i < (NUM_OUTPUTS * TOTAL_INPUTS); i++)
-                currentModel.weights[i] = 0.01f;
-            for (int i = 0; i < NUM_OUTPUTS; i++)
-                currentModel.bias[i] = 0.0f;
-            for (int i = 0; i < TOTAL_INPUTS; i++)
-                currentModel.normalCentroids[i] = 0.5f;
-
-            saveModelToFlash();     // Lưu cứng bộ khung sơ cấp này xuống file /model.bin
-            isSystemTrained = true; // Kích hoạt đèn xanh cho hệ thống chuyển sang Edge AI thực tế
-            Serial.println(F("[ESP32-S3] Đã thiết lập xong dải chuẩn hóa nền. Chuyển sang chế độ chạy Edge AI!"));
+            AIoT.device.Relay(14).off();
         }
-        return; // Ngắt vòng lặp loop, không cho chạy suy luận AI khi đang khởi tạo mẫu
+
+        // BƯỚC 5: Đẩy kết quả AI lên Cloud Dashboard qua MQTT
+        AIoT.updateTelemetry("ai_label", (int)label);
+        AIoT.updateTelemetry("ai_conf", AIoT.edgeAI.getWinnerConfidence() * 100.0f);
+        AIoT.updateTelemetry("ai_latency_us", (int)AIoT.edgeAI.getExecutionTime());
     }
 
-    // TRƯỜNG HỢP B: HỆ THỐNG ĐÃ SẴN SÀNG VẬN HÀNH PIPELINE EDGE AI
-    // -------------------------------------------------------------------------
-    // 1. Đọc dữ liệu phòng học thực tế -> Tính toán 16 đặc trưng thống kê nối đuôi
-    float X_raw[TOTAL_INPUTS];
-    // (Giả sử bạn đã gọi FeatureExtraction để đổ đầy 16 số vào mảng X_raw này...)
-
-    // 2. Chạy vòng lặp chuẩn hóa Min-Max cho vector 16 phần tử đứng nối đuôi nhau
-    float X_normalized[TOTAL_INPUTS];
-    for (int i = 0; i < TOTAL_INPUTS; i++)
-    {
-        X_normalized[i] = (X_raw[i] - currentModel.minRanges[i]) / (currentModel.maxRanges[i] - currentModel.minRanges[i]);
-    }
-
-    // 3. Nhân ma trận Trọng số (W) và cộng Bias (b) từ bộ nhớ Flash đã nạp lên RAM
-    float output[NUM_OUTPUTS] = {0.0f, 0.0f, 0.0f};
-    for (int out = 0; out < NUM_OUTPUTS; out++)
-    {
-        for (int in = 0; in < TOTAL_INPUTS; in++)
-        {
-            // Phép tính mạng thần kinh lõi: Kết quả = Tổng(X_chuẩn_hóa * W) + b
-            output[out] += X_normalized[in] * currentModel.weights[out * TOTAL_INPUTS + in];
-        }
-        output[out] += currentModel.bias[out];
-    }
-
-    // Giả lập in kết quả trạng thái phòng học sau khi tính toán ra Serial Monitor của GUI Python
-    Serial.printf("LOG_PHÒNG: Trạng thái 0 (Bình thường): %.2f | Trạng thái 1 (Quá đông): %.2f\n", output[0], output[1]);
-
-    // -------------------------------------------------------------------------
-    // LUÔN LUÔN LẮNG NGHE ĐƯỜNG SERIAL ĐỂ NHẬN BẢN CẬP NHẬT TRỌNG SỐ TỪ PYTHON GUI
-    checkSerialForNewWeights();
-
-    delay(1000); // Tốc độ quét suy luận hệ thống 1 giây / lần
+    delay(20); // Chu kỳ lấy mẫu 50Hz (20ms/mẫu)
 }
