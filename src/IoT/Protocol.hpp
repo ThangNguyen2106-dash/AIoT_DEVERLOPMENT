@@ -4,6 +4,7 @@
 #include <IoT/DEBUG.hpp>
 #include <WiFi/AIoT_PnP_ESP32.hpp>
 #include <AI/EdgeAI/EdgeAI.hpp>
+#include <AI/CloudAI/CloudAI.h>
 #include <AI/HybridAI/HybridAI.h>
 #include <Device/Device.h>
 
@@ -21,6 +22,8 @@ private:
 public:
     AIoTDeviceManager &device;
     EdgeAI edgeAI;
+    CloudAI::GeminiClient cloudAI;
+    HybridAI::Bridge hybridAI;
 
     AIoTProtocol();
     ~AIoTProtocol();
@@ -47,7 +50,8 @@ public:
 };
 
 AIoTProtocol::AIoTProtocol(/* args */)
-    : device(AIoT_Device)
+    : device(AIoT_Device),
+      hybridAI(&edgeAI, &cloudAI)
 {
 }
 

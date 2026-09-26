@@ -26,13 +26,13 @@
 class EdgeAI
 {
 public:
-    static const size_t MAX_CHANNELS = 4;  // Hỗ trợ tối đa 4 kênh cảm biến đồng thời
-    static const size_t MAX_WINDOW = 32;   // Kích thước tối đa của cửa sổ trượt
-    static const size_t MAX_FEATURES = 16; // Tối đa 4 kênh * 4 đặc trưng = 16
-    static const size_t MAX_LABELS = 16;   // Tối đa 16 nhãn phân loại (Softmax)
-    static const size_t MAX_CMDS = 8;      // Tối đa 8 lệnh điều khiển độc lập (Sigmoid)
-    static const size_t MAX_OUTPUTS = MAX_LABELS + MAX_CMDS;       // Tối đa 24 đầu ra
-    static const size_t MAX_WEIGHTS = MAX_OUTPUTS * MAX_FEATURES;  // Tối đa 384 trọng số
+    static const size_t MAX_CHANNELS = 4;                         // Hỗ trợ tối đa 4 kênh cảm biến đồng thời
+    static const size_t MAX_WINDOW = 32;                          // Kích thước tối đa của cửa sổ trượt
+    static const size_t MAX_FEATURES = 16;                        // Tối đa 4 kênh * 4 đặc trưng = 16
+    static const size_t MAX_LABELS = 16;                          // Tối đa 16 nhãn phân loại (Softmax)
+    static const size_t MAX_CMDS = 8;                             // Tối đa 8 lệnh điều khiển độc lập (Sigmoid)
+    static const size_t MAX_OUTPUTS = MAX_LABELS + MAX_CMDS;      // Tối đa 24 đầu ra
+    static const size_t MAX_WEIGHTS = MAX_OUTPUTS * MAX_FEATURES; // Tối đa 384 trọng số
 
     enum NormType
     {
