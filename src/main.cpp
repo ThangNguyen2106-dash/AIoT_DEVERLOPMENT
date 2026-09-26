@@ -18,7 +18,7 @@
 // 1. TRỌNG SỐ CHO 4 ĐẦU RA SIGMOID (4 Lệnh x 16 Inputs = 64 Trọng số)
 // ==============================================================================
 // 16 đầu vào: 4 kênh cảm biến x 4 đặc trưng (Mean, RMS, P2P, StdDev)
-const char *LABEL_NAMES[3] = {"NORMAL", "WARNING", "CRITICAL_FAULT"};
+const char *LABEL_NAMES[5] = {"NORMAL", "WARNING", "CRITICAL_FAULT", "OVERLOAD", "UNKNOW"};
 const float W[80] = {
     // --- [NHÓM 1: 3 HÀNG CHO SOFTMAX LABELS (0, 1, 2)] ---
     // Hàng 0 - Label 0 (NORMAL): Trọng số âm khi rung, dòng, nhiệt tăng cao
