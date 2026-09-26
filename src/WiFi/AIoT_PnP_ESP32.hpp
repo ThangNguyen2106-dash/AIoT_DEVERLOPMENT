@@ -620,14 +620,18 @@ inline void PnP<Transport>::CONFIG_MQTT()
         {
             Serial.print(
                 "\r\n"
-                " █████╗ ██╗          ████████╗\r\n"
-                "██╔══██╗██║          ╚══██╔══╝\r\n"
-                "███████║██║  ██████╗    ██║   \r\n"
-                "██╔══██║██║ ██╔═══██╗   ██║   \r\n"
-                "██║  ██║██║ ╚██████╔╝   ██║   \r\n"
-                "╚═╝  ╚═╝╚═╝  ╚═════╝    ╚═╝   \r\n"
-                "  AIoT Firmware v1.0.0\r\n"
-                "  ESP32 AIoT Controller\r\n\r\n");
+                "            █████╗ ██╗          ████████╗\r\n"
+                "           ██╔══██╗██║          ╚══██╔══╝\r\n"
+                "           ███████║██║  ██████╗    ██║   \r\n"
+                "           ██╔══██║██║ ██╔═══██╗   ██║   \r\n"
+                "           ██║  ██║██║ ╚██████╔╝   ██║   \r\n"
+                "           ╚═╝  ╚═╝╚═╝  ╚═════╝    ╚═╝   \r\n"
+                "           AIoT Firmware v1.0.0\r\n");
+            Serial.println("===============================================================");
+            Serial.println("       ESP32-S3 HYBRID AIoT CHAT SYSTEM SẴN SÀNG!");
+            Serial.println("       - Gõ 'xin chào' để kích hoạt Greeting_action & mở đầu");
+            Serial.println("       - Gõ bất kỳ câu hỏi nào để trò chuyện cùng AI");
+            Serial.println("=================================================================");
         }
         SaveMQTT(mqttusername, mqttpass);
         WiFi_STATE = MODE_CONNECTED;

@@ -23,10 +23,10 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-3.6-flash")
 
 def on_connect(client, userdata, flags, rc):
-    print(f"✅ Đã kết nối HiveMQ Cloud Broker (RC: {rc})")
+    print(f"[INFO] Connected to HiveMQ Cloud Broker (RC: {rc})")
     # Lắng nghe telemetry từ tất cả các thiết bị ESP32
     client.subscribe("device/+/telemetry")
-    print("📡 Đang lắng nghe topic: device/+/telemetry...")
+    print("[INFO] Subscribed to topic: device/+/telemetry")
 
 def on_message(client, userdata, msg):
     try:
@@ -36,7 +36,7 @@ def on_message(client, userdata, msg):
         
         user_prompt = data.get("user_prompt")
         if user_prompt:
-            print(f"\n👤 [FROM ESP32 {mac}]: {user_prompt}")
+            print(f"\n[USER_PROMPT] [FROM ESP32 {mac}]: {user_prompt}")
             
             # Ngữ cảnh cảm biến & Edge AI từ ESP32
             context = f"Dữ liệu thiết bị {mac}: Rung động={data.get('live_vibr_rms', 'N/A')} mm/s, Nhiệt độ={data.get('live_temp', 'N/A')} C. Câu hỏi: {user_prompt}"
@@ -45,7 +45,7 @@ def on_message(client, userdata, msg):
             response = model.generate_content(context)
             ai_reply = response.text.strip()
             
-            print(f"🤖 [GEMINI AI]: {ai_reply}")
+            print(f"[GEMINI_REPLY]: {ai_reply}")
             
             # Gửi câu trả lời về lại ESP32 qua topic control
             reply_topic = f"device/{mac}/control"
@@ -56,10 +56,10 @@ def on_message(client, userdata, msg):
                 }
             }
             client.publish(reply_topic, json.dumps(control_payload))
-            print(f"📤 Đã gửi phản hồi về topic: {reply_topic}")
+            print(f"[INFO] Published response to: {reply_topic}")
             
     except Exception as e:
-        print(f"⚠️ Lỗi xử lý message: {e}")
+        print(f"[ERROR] Message handling exception: {e}")
 
 if __name__ == "__main__":
     client = mqtt.Client()
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     client.on_connect = on_connect
     client.on_message = on_message
 
-    print("🚀 Đang khởi động AIoT Cloud AI Agent...")
+    print("[INFO] Starting AIoT Cloud AI Agent...")
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.loop_forever()
 

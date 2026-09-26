@@ -3,6 +3,10 @@
 
 #include <IoT/DEBUG.hpp>
 #include <WiFi/AIoT_PnP_ESP32.hpp>
+#include <AI/EdgeAI/EdgeAI.hpp>
+#include <AI/CloudAI/CloudAI.h>
+#include <AI/HybridAI/HybridAI.h>
+#include <Device/Device.h>
 
 class AIoTProtocol
 {
@@ -16,6 +20,11 @@ private:
     unsigned long IoT_time, IoT_set_time;
 
 public:
+    AIoTDeviceManager &device;
+    EdgeAI edgeAI;
+    CloudAI::GeminiClient cloudAI;
+    HybridAI::Bridge hybridAI;
+
     AIoTProtocol();
     ~AIoTProtocol();
     void begin(const char *sta_ssid, const char *sta_pass);
@@ -41,11 +50,23 @@ public:
 };
 
 AIoTProtocol::AIoTProtocol(/* args */)
+    : device(AIoT_Device),
+      hybridAI(&edgeAI, &cloudAI)
 {
 }
 
 AIoTProtocol::~AIoTProtocol()
 {
+    if (tele_root != NULL)
+    {
+        cJSON_Delete(tele_root);
+        tele_root = NULL;
+    }
+    if (control_root != NULL)
+    {
+        cJSON_Delete(control_root);
+        control_root = NULL;
+    }
 }
 
 void AIoTProtocol::begin(const char *sta_ssid, const char *sta_pass)
@@ -248,6 +269,5 @@ void AIoTProtocol::run()
 
 typedef AIoTProtocol PROTOCOL;
 AIoTProtocol AIoT;
-#define TZIoT AIoT
 
 #endif /*INC_AIOT_PROTOCOL_HPP_*/
