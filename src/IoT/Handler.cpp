@@ -1,5 +1,4 @@
 #include <IoT/Handler.hpp>
-#include <IoT/DEBUG.hpp>
 #include <cstring>
 #include <Arduino.h>
 

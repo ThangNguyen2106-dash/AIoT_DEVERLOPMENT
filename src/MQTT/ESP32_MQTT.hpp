@@ -5,9 +5,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <MQTT/PubSubClient/PubSubClient.h>
-#include <stdint.h>
 #include <IoT/API.hpp>
-#include <IoT/Param.hpp>
 #include <lwip/dns.h>
 
 template <class MQTT>

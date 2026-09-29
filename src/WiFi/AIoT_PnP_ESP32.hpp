@@ -2,12 +2,10 @@
 #define AIOT_PNP_ESP32
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiClient.h>
 #include <DNSServer.h>
 #include <WebServer.h>
 #include <Preferences.h>
 
-#include <IoT/API.hpp>
 #include <MQTT/ESP32_MQTT.hpp>
 #include <WiFi/CONFIG_UI.h>
 #include <lwip/dns.h>

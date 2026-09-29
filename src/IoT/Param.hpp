@@ -1,12 +1,9 @@
 #ifndef INC_AIOT_PARAM
 #define INC_AIOT_PARAM
-#include <stdio.h>
-#include <stdint.h>
+
 #include <Arduino.h>
-#include <IoT/API.hpp>
 #include <Ultility/Param/cJSON.hpp>
 
-#pragma once
 class Param
 {
 public:

@@ -9,8 +9,6 @@
 #include <IoT/Param.hpp>
 #include <IoT/Handler.hpp>
 
-#include <stdarg.h>
-
 DataHandler AIoT_Data_Handler;
 #define TECH AIoT_Data_Handler
 
