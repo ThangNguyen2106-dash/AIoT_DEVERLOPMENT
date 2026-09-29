@@ -139,10 +139,12 @@ namespace CloudAI
             free(jsonPayload);
 
             String reply = "";
+            reply.reserve(512); // Tránh nhiều lần realloc heap cho câu trả lời ngắn
             if (httpCode == HTTP_CODE_OK || httpCode == 200)
             {
                 String responseBody = http.getString();
                 cJSON *resRoot = cJSON_Parse(responseBody.c_str());
+                responseBody = ""; // Giải phóng bộ nhớ chuỗi response ngay sau khi parse cJSON
                 if (resRoot != nullptr)
                 {
                     cJSON *candidates = cJSON_GetObjectItem(resRoot, "candidates");
@@ -159,7 +161,7 @@ namespace CloudAI
                                 cJSON *textItem = cJSON_GetObjectItem(part0, "text");
                                 if (textItem && textItem->valuestring)
                                 {
-                                    reply = String(textItem->valuestring);
+                                    reply = textItem->valuestring;
                                 }
                             }
                         }

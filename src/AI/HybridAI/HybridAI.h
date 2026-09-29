@@ -21,10 +21,21 @@ namespace HybridAI
     private:
         EdgeAI *_edgeAI;
         CloudAI::GeminiClient *_cloudAI;
+        // Buffer nội bộ để tránh stack overflow khi sync model từ Cloud (1720 bytes trên stack là quá lớn)
+        float _syncTempW[EdgeAI::MAX_WEIGHTS];      // 384 * 4 = 1536 bytes
+        float _syncTempB[EdgeAI::MAX_OUTPUTS];      // 24  * 4 = 96 bytes
+        float _syncTempNorm1[EdgeAI::MAX_FEATURES]; // 16  * 4 = 64 bytes
+        float _syncTempNorm2[EdgeAI::MAX_FEATURES]; // 16  * 4 = 64 bytes
 
     public:
         Bridge(EdgeAI *edge = nullptr, CloudAI::GeminiClient *cloud = nullptr)
-            : _edgeAI(edge), _cloudAI(cloud) {}
+            : _edgeAI(edge), _cloudAI(cloud)
+        {
+            memset(_syncTempW,    0, sizeof(_syncTempW));
+            memset(_syncTempB,    0, sizeof(_syncTempB));
+            memset(_syncTempNorm1, 0, sizeof(_syncTempNorm1));
+            memset(_syncTempNorm2, 0, sizeof(_syncTempNorm2));
+        }
 
         void bind(EdgeAI *edge, CloudAI::GeminiClient *cloud = nullptr)
         {
@@ -116,6 +127,14 @@ namespace HybridAI
             size_t totalOutputs = numLabels + numCmds;
             size_t totalWeights = totalOutputs * inputDim;
 
+            if (inputDim > EdgeAI::MAX_FEATURES || totalOutputs > EdgeAI::MAX_OUTPUTS || totalWeights > EdgeAI::MAX_WEIGHTS)
+            {
+                LOG_ERROR("HYBRID_AI", "syncModelFromJson: Model dimensions exceed max capacity! (InDim:%u, Out:%u, W:%u)",
+                          (unsigned)inputDim, (unsigned)totalOutputs, (unsigned)totalWeights);
+                cJSON_Delete(root);
+                return false;
+            }
+
             int wSize = cJSON_GetArraySize(wItem);
             int bSize = cJSON_GetArraySize(bItem);
 
@@ -127,19 +146,33 @@ namespace HybridAI
                 return false;
             }
 
-            float tempW[EdgeAI::MAX_WEIGHTS];
-            float tempB[EdgeAI::MAX_OUTPUTS];
+            float *tempW = _syncTempW;
+            float *tempB = _syncTempB;
             for (size_t i = 0; i < totalWeights; i++)
             {
-                tempW[i] = (float)cJSON_GetArrayItem(wItem, i)->valuedouble;
+                cJSON *item = cJSON_GetArrayItem(wItem, i);
+                if (item == nullptr)
+                {
+                    LOG_ERROR("HYBRID_AI", "syncModelFromJson: Null item in W array at index %u", (unsigned)i);
+                    cJSON_Delete(root);
+                    return false;
+                }
+                tempW[i] = (float)item->valuedouble;
             }
             for (size_t i = 0; i < totalOutputs; i++)
             {
-                tempB[i] = (float)cJSON_GetArrayItem(bItem, i)->valuedouble;
+                cJSON *item = cJSON_GetArrayItem(bItem, i);
+                if (item == nullptr)
+                {
+                    LOG_ERROR("HYBRID_AI", "syncModelFromJson: Null item in b array at index %u", (unsigned)i);
+                    cJSON_Delete(root);
+                    return false;
+                }
+                tempB[i] = (float)item->valuedouble;
             }
 
-            float tempNorm1[EdgeAI::MAX_FEATURES];
-            float tempNorm2[EdgeAI::MAX_FEATURES];
+            float *tempNorm1 = _syncTempNorm1;
+            float *tempNorm2 = _syncTempNorm2;
             float *pNorm1 = nullptr;
             float *pNorm2 = nullptr;
 
@@ -149,13 +182,24 @@ namespace HybridAI
                 int n2Size = cJSON_GetArraySize(norm2Item);
                 if (n1Size == (int)inputDim && n2Size == (int)inputDim)
                 {
+                    bool normOk = true;
                     for (size_t i = 0; i < inputDim; i++)
                     {
-                        tempNorm1[i] = (float)cJSON_GetArrayItem(norm1Item, i)->valuedouble;
-                        tempNorm2[i] = (float)cJSON_GetArrayItem(norm2Item, i)->valuedouble;
+                        cJSON *it1 = cJSON_GetArrayItem(norm1Item, i);
+                        cJSON *it2 = cJSON_GetArrayItem(norm2Item, i);
+                        if (!it1 || !it2)
+                        {
+                            normOk = false;
+                            break;
+                        }
+                        tempNorm1[i] = (float)it1->valuedouble;
+                        tempNorm2[i] = (float)it2->valuedouble;
                     }
-                    pNorm1 = tempNorm1;
-                    pNorm2 = tempNorm2;
+                    if (normOk)
+                    {
+                        pNorm1 = _syncTempNorm1;
+                        pNorm2 = _syncTempNorm2;
+                    }
                 }
             }
 

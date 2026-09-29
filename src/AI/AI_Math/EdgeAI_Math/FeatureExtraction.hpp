@@ -83,6 +83,7 @@ namespace AI_Math
         }
 
         // Chuẩn hóa Vector đặc trưng theo chuẩn hóa Min - Max (Công thức: x_norm = (x - minVal) / (maxVal - minVal))
+        __attribute__((noinline))
         static float minMaxScale(float value, float minVal, float maxVal)
         {
             if (fabsf(maxVal - minVal) < 1e-6f)
@@ -94,6 +95,8 @@ namespace AI_Math
                 scaled = 1.0f;
             return scaled;
         }
+
+        __attribute__((noinline))
         static void normalizeMinMax(const float *inVector, const float *minVals, const float *maxVals, float *outVector, size_t length)
         {
             if (inVector == nullptr || outVector == nullptr || minVals == nullptr || maxVals == nullptr)
@@ -105,12 +108,15 @@ namespace AI_Math
         }
 
         // Chuẩn hóa Vector đặc trưng theo chuẩn hóa Z-Score () (Công thức: z = (x - meanVal) / stdDevVal)
+        __attribute__((noinline))
         static float zScore(float value, float meanVal, float stdDevVal)
         {
             if (stdDevVal < 1e-6f)
                 return 0.0f;
             return (value - meanVal) / stdDevVal;
         }
+
+        __attribute__((noinline))
         static void normalizeZScore(const float *inVector, const float *meanVals, const float *stdDevVals, float *outVector, size_t length)
         {
             if (inVector == nullptr || outVector == nullptr || meanVals == nullptr || stdDevVals == nullptr)
@@ -123,5 +129,4 @@ namespace AI_Math
     };
 
 }
-AI_Math::FeatureExtractor featureExtractor;
 #endif /* AI_MATH_FEATURE_EXTRACTION_HPP */

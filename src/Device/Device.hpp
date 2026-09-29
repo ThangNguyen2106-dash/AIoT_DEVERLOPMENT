@@ -146,22 +146,17 @@ public:
         int rgbPin = actuators.getRgbPin();
         if (rgbPin >= 0)
         {
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)rgbPin, false);
             neopixelWrite(rgbPin, r, g, b);
         }
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
         // Hỗ trợ tự động fallback nếu người dùng dùng board ESP32-S3 DevKit Rev 1.0 (48) hoặc Rev 1.1 (38)
         if (rgbPin == 48)
         {
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)38, false);
             neopixelWrite(38, r, g, b);
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)48, false);
         }
         else if (rgbPin == 38)
         {
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)48, false);
             neopixelWrite(48, r, g, b);
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)38, false);
         }
 #endif
 #endif

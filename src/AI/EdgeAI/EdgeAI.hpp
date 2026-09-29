@@ -373,13 +373,25 @@ public:
             return false;
         }
 
-        memcpy(_dynamicW, W, totalWeights * sizeof(float));
-        memcpy(_dynamicB, b, totalOutputs * sizeof(float));
+        if (_dynamicW != W)
+        {
+            memcpy(_dynamicW, W, totalWeights * sizeof(float));
+        }
+        if (_dynamicB != b)
+        {
+            memcpy(_dynamicB, b, totalOutputs * sizeof(float));
+        }
 
         if (normType != NORM_NONE && norm1 != nullptr && norm2 != nullptr)
         {
-            memcpy(_dynamicNorm1, norm1, inputDim * sizeof(float));
-            memcpy(_dynamicNorm2, norm2, inputDim * sizeof(float));
+            if (_dynamicNorm1 != norm1)
+            {
+                memcpy(_dynamicNorm1, norm1, inputDim * sizeof(float));
+            }
+            if (_dynamicNorm2 != norm2)
+            {
+                memcpy(_dynamicNorm2, norm2, inputDim * sizeof(float));
+            }
             _normParam1 = _dynamicNorm1;
             _normParam2 = _dynamicNorm2;
         }
@@ -580,6 +592,14 @@ public:
                 AI_Math::FeatureExtractor::normalizeMinMax(
                     _rawFeatures, _normParam1, _normParam2, _normFeatures, totalFeatures);
             }
+            else
+            {
+                LOG_WARN("EDGE_AI", "Min-Max normalization active but parameters missing! Falling back to raw features.");
+                for (size_t i = 0; i < totalFeatures; i++)
+                {
+                    _normFeatures[i] = _rawFeatures[i];
+                }
+            }
             break;
 
         case NORM_Z_SCORE:
@@ -587,6 +607,14 @@ public:
             {
                 AI_Math::FeatureExtractor::normalizeZScore(
                     _rawFeatures, _normParam1, _normParam2, _normFeatures, totalFeatures);
+            }
+            else
+            {
+                LOG_WARN("EDGE_AI", "Z-Score normalization active but parameters missing! Falling back to raw features.");
+                for (size_t i = 0; i < totalFeatures; i++)
+                {
+                    _normFeatures[i] = _rawFeatures[i];
+                }
             }
             break;
 

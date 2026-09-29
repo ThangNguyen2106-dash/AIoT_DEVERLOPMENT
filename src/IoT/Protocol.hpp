@@ -49,13 +49,13 @@ public:
     void (*_timerCallback)() = NULL;
 };
 
-AIoTProtocol::AIoTProtocol(/* args */)
+inline AIoTProtocol::AIoTProtocol(/* args */)
     : device(AIoT_Device),
       hybridAI(&edgeAI, &cloudAI)
 {
 }
 
-AIoTProtocol::~AIoTProtocol()
+inline AIoTProtocol::~AIoTProtocol()
 {
     if (tele_root != NULL)
     {
@@ -69,16 +69,16 @@ AIoTProtocol::~AIoTProtocol()
     }
 }
 
-void AIoTProtocol::begin(const char *sta_ssid, const char *sta_pass)
+inline void AIoTProtocol::begin(const char *sta_ssid, const char *sta_pass)
 {
     this->PNP.begin(sta_ssid, sta_pass);
 }
-void AIoTProtocol::begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_userName, const char *mqtt_pass)
+inline void AIoTProtocol::begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_userName, const char *mqtt_pass)
 {
     this->PNP.begin(sta_ssid, sta_pass, mqtt_userName, mqtt_pass);
 }
 
-void AIoTProtocol::timeEvented()
+inline void AIoTProtocol::timeEvented()
 {
     unsigned long now = millis();
 
@@ -93,7 +93,7 @@ void AIoTProtocol::timeEvented()
     }
 }
 
-int AIoTProtocol::addTimeEvent(unsigned long time, void (*callback)())
+inline int AIoTProtocol::addTimeEvent(unsigned long time, void (*callback)())
 {
     IoT_set_time = time;
     IoT_time = millis();
@@ -140,13 +140,13 @@ void AIoTProtocol::setControl(Args... args)
 
     if (cJSON_PrintPreallocated(control_root, buffer, sizeof(buffer), 0))
     {
-        LOG_DEBUG("SET_TELE", "%s", buffer);
+        LOG_DEBUG("SET_CONTROL", "%s", buffer);
 
         API_MESS.Set_control(buffer);
     }
     else
     {
-        LOG_ERROR("SET_TELE", "Buffer too small!");
+        LOG_ERROR("SET_CONTROL", "Buffer too small!");
     }
 }
 
@@ -195,12 +195,12 @@ void AIoTProtocol::setTelemetry(Args... args)
     }
 }
 
-void AIoTProtocol::updateTelemetry(const char *key, const Param value)
+inline void AIoTProtocol::updateTelemetry(const char *key, const Param value)
 {
     this->API_MESS.SetTelemetryValue(key, value);
 }
 
-void AIoTProtocol::sendTelemetry()
+inline void AIoTProtocol::sendTelemetry()
 {
     if ((WiFi.status() == WL_CONNECTED) && serverMQTT.check_connect())
     {
@@ -212,12 +212,12 @@ void AIoTProtocol::sendTelemetry()
     }
 }
 
-void AIoTProtocol::updateControl(const char *key, const Param value)
+inline void AIoTProtocol::updateControl(const char *key, const Param value)
 {
     this->API_MESS.WriteControl(key, value);
 }
 
-void AIoTProtocol::sendControl()
+inline void AIoTProtocol::sendControl()
 {
     if ((WiFi.status() == WL_CONNECTED) && serverMQTT.check_connect())
     {
@@ -225,7 +225,7 @@ void AIoTProtocol::sendControl()
     }
 }
 
-void AIoTProtocol::writeControl(const char *key, const Param value)
+inline void AIoTProtocol::writeControl(const char *key, const Param value)
 {
     if ((WiFi.status() == WL_CONNECTED) && serverMQTT.check_connect())
     {
@@ -237,7 +237,7 @@ void AIoTProtocol::writeControl(const char *key, const Param value)
     }
 }
 
-void AIoTProtocol::writeTelemetry(const char *key, const Param value)
+inline void AIoTProtocol::writeTelemetry(const char *key, const Param value)
 {
     if ((WiFi.status() == WL_CONNECTED) && serverMQTT.check_connect())
     {
@@ -249,7 +249,7 @@ void AIoTProtocol::writeTelemetry(const char *key, const Param value)
     }
 }
 
-bool AIoTProtocol::CheckConnect()
+inline bool AIoTProtocol::CheckConnect()
 {
     if (WiFi.status() == WL_CONNECTED)
     {
@@ -261,7 +261,7 @@ bool AIoTProtocol::CheckConnect()
     }
 }
 
-void AIoTProtocol::run()
+inline void AIoTProtocol::run()
 {
     this->PNP.run();
     this->timeEvented();

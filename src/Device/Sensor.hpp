@@ -35,6 +35,11 @@ public:
         }
     }
 
+    /**
+     * @brief Đọc giá trị ADC analog từ kênh cảm biến
+     * @note Trên ESP32 WROOM-32: Hãy ưu tiên sử dụng các chân ADC1 (GPIO 32 - 39).
+     *       Tránh sử dụng ADC2 (GPIO 0, 2, 4, 12-15, 25-27) khi WiFi đang hoạt động vì sẽ bị xung đột phần cứng.
+     */
     int readAnalog(uint8_t index) const
     {
         if (index < 8 && _analogPins[index] >= 0)
@@ -46,6 +51,8 @@ public:
 
     float readAnalogVoltage(uint8_t index, float vRef = 3.3f, int maxAdc = 4095) const
     {
+        if (maxAdc <= 0)
+            return 0.0f;
         int raw = readAnalog(index);
         return ((float)raw / (float)maxAdc) * vRef;
     }

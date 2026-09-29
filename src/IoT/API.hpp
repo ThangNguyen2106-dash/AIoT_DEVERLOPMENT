@@ -23,7 +23,7 @@ typedef enum
     PIN_UNKNOWN
 } PinType_t;
 
-PinType_t parsePinType(const char *type)
+inline PinType_t parsePinType(const char *type)
 {
     if (strcmp(type, "DO") == 0)
         return PIN_DO;
@@ -66,7 +66,7 @@ private:
 #define API_SUB_PREFIX_CONTROL_TOPIC "control"
 #ifdef API_100_PINS
     String uuid_list[100];
-    int16_t ID_control[];
+    int16_t ID_control[100];
 #else
     String uuid_list[50];
     int16_t ID_control[50];
@@ -123,21 +123,33 @@ void API::handler_control(const char *payload)
         if (cJSON_IsObject(Object))
         {
             char *Object_tem = cJSON_Print(Object);
-
-            this->handlerVirtual_Pin(Object_tem);
+            if (Object_tem != nullptr)
+            {
+                this->handlerVirtual_Pin(Object_tem);
+                free(Object_tem);
+                Object_tem = nullptr;
+            }
         }
         cJSON *Object1 = cJSON_GetObjectItem(data, "mcu_pin");
         if (cJSON_IsObject(Object1))
         {
             char *Object_tem1 = cJSON_Print(data);
-
-            this->handlerArduino_Pin(Object_tem1);
+            if (Object_tem1 != nullptr)
+            {
+                this->handlerArduino_Pin(Object_tem1);
+                free(Object_tem1);
+                Object_tem1 = nullptr;
+            }
         }
         else if (cJSON_IsArray(Object1))
         {
             char *Object_tem1 = cJSON_Print(data);
-
-            this->handlerArduino_Pin(Object_tem1);
+            if (Object_tem1 != nullptr)
+            {
+                this->handlerArduino_Pin(Object_tem1);
+                free(Object_tem1);
+                Object_tem1 = nullptr;
+            }
         }
 
         cJSON *item = data->child;

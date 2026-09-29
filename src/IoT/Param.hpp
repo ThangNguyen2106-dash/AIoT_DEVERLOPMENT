@@ -197,7 +197,7 @@ private:
     int Pin_h = 0;
 };
 
-Param parseItem(cJSON *item)
+inline Param parseItem(cJSON *item)
 {
     Param value;
 

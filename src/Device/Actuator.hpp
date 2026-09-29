@@ -3,10 +3,6 @@
 
 #include <Arduino.h>
 
-#if defined(ESP32)
-#include "driver/rmt.h"
-#endif
-
 struct RelayDescriptor
 {
     int pin;
@@ -20,7 +16,7 @@ class ActuatorManager
 public:
     static const size_t MAX_RELAYS = 16;
 
-    ActuatorManager() : _ledPin(-1), _buzzerPin(-1), _rgbPin(-1), _relayCount(0)
+    ActuatorManager() : _ledPin(-1), _buzzerPin(-1), _rgbPin(-1), _relayCount(0), _buzzerActive(false), _buzzerEndMs(0)
     {
         for (size_t i = 0; i < MAX_RELAYS; i++)
         {
@@ -230,8 +226,17 @@ public:
         if (_rgbPin >= 0)
         {
 #if defined(ESP32)
-            rmt_set_gpio((rmt_channel_t)0, RMT_MODE_TX, (gpio_num_t)_rgbPin, false);
             neopixelWrite(_rgbPin, 0, 0, 0); // Tắt ban đầu
+#endif
+        }
+    }
+
+    void setRgbColor(uint8_t r, uint8_t g, uint8_t b)
+    {
+        if (_rgbPin >= 0)
+        {
+#if defined(ESP32)
+            neopixelWrite(_rgbPin, r, g, b);
 #endif
         }
     }
@@ -282,9 +287,9 @@ public:
     {
         if (_buzzerPin >= 0)
         {
+            _buzzerEndMs = millis() + durationMs;
+            _buzzerActive = true;
             digitalWrite(_buzzerPin, HIGH);
-            delay(durationMs);
-            digitalWrite(_buzzerPin, LOW);
         }
     }
 
@@ -296,12 +301,30 @@ public:
         }
     }
 
+    /**
+     * @brief Gọi trong loop() để xử lý tắt buzzer non-blocking
+     *        Được gọi tự động bởi AIoTProtocol::run()
+     */
+    void tickBuzzer()
+    {
+        if (_buzzerActive && _buzzerPin >= 0)
+        {
+            if ((long)(millis() - _buzzerEndMs) >= 0)
+            {
+                digitalWrite(_buzzerPin, LOW);
+                _buzzerActive = false;
+            }
+        }
+    }
+
 private:
     int _ledPin;
     int _buzzerPin;
     int _rgbPin;
     RelayDescriptor _relays[MAX_RELAYS];
     size_t _relayCount;
+    bool _buzzerActive;           // Trạng thái buzzer đang kêu non-blocking
+    unsigned long _buzzerEndMs;   // Thời điểm kết thúc buzzer
 };
 
 #endif /* AIOT_DEVICE_ACTUATOR_HPP */

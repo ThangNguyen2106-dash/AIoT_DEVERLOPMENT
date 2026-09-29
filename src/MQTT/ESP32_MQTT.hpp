@@ -32,10 +32,24 @@ public:
     void UnpublishTopic(const char *baseTopic, const char *Topic_ne);
 
 private:
+#ifndef MQTT_DEFAULT_SERVER
     const char *MQTT_Server = "74f78261a2504f078425eb1b85f3eaed.s1.eu.hivemq.cloud";
+#else
+    const char *MQTT_Server = MQTT_DEFAULT_SERVER;
+#endif
     const int16_t MQTT_PORT = 8883;
+
+#ifndef MQTT_DEFAULT_USERNAME
     char MQTT_USERNAME[64] = "IoT_TEST";
+#else
+    char MQTT_USERNAME[64] = MQTT_DEFAULT_USERNAME;
+#endif
+
+#ifndef MQTT_DEFAULT_PASS
     char MQTT_PASS[64] = "mt21062005";
+#else
+    char MQTT_PASS[64] = MQTT_DEFAULT_PASS;
+#endif
 
     char MQTT_BASE_TOPIC[64] = BASE_TOPIC;
     char _mac[32];
@@ -215,7 +229,7 @@ inline void AIoT_MQTT_ESP32<MQTT>::begin()
 
         mqttClient.setClient(server);
         mqttClient.setServer(MQTT_Server, MQTT_PORT);
-        mqttClient.setBufferSize(512);
+        mqttClient.setBufferSize(1280);
         mqttClient.setKeepAlive(60);
         mqttClient.setSocketTimeout(10);
         mqttClient.setCallback(AIoT_Callback);

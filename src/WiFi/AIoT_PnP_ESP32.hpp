@@ -19,7 +19,9 @@ char STA_WIFI_PASS[32];
 #define STA_WIFI_PORT "80"
 
 #define AP_WIFI_NAME "AIoT: "
+#ifndef AP_WIFI_PASS
 #define AP_WIFI_PASS "IoT210605"
+#endif
 #define AP_WIFI_IP "192.168.21.6"
 #define AP_WIFI_PORT "80"
 
@@ -527,6 +529,7 @@ inline void PnP<Transport>::CONFIG_STA()
                 t0 = millis();
             }
             delay(10);
+            yield(); // Feed Watchdog Timer and yield to FreeRTOS scheduler
         }
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -559,6 +562,7 @@ inline void PnP<Transport>::CONFIG_STA()
                 t0 = millis();
             }
             delay(10);
+            yield(); // Feed Watchdog Timer and yield to FreeRTOS scheduler
         }
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -832,24 +836,26 @@ template <class Transport>
 inline void PnP<Transport>::FAILD_MQTT()
 {
     static unsigned long lastMqttRetry = 0;
-    if (lastMqttRetry == 0)
+    static bool mqttRetryTimerStarted = false;
+    if (!mqttRetryTimerStarted)
     {
         lastMqttRetry = millis();
+        mqttRetryTimerStarted = true;
     }
 
     // Nếu Wi-Fi bị mất trong lúc này -> Chuyển ngay sang chế độ phục hồi Wi-Fi
     if (WiFi.status() != WL_CONNECTED)
     {
-        lastMqttRetry = 0;
+        mqttRetryTimerStarted = false;
         LOG_ERROR("MQTT", "WIFI LOST WHILE RECOVERING MQTT -> SWITCH TO WIFI RECOVERY");
         WiFi_STATE = MODE_LOST_CONNECT_WIFI;
         return;
     }
 
     // Nếu Wi-Fi vẫn còn nhưng MQTT rớt, tự động thử lại sau mỗi 5 giây
-    if (millis() - lastMqttRetry >= 5000)
+    if ((unsigned long)(millis() - lastMqttRetry) >= 5000UL)
     {
-        lastMqttRetry = 0;
+        mqttRetryTimerStarted = false;
         LOG_MQTT("MQTT", "RETRYING MQTT CONNECTION...");
         WiFi_STATE = MODE_LOST_CONNECT_MQTT;
     }
@@ -859,13 +865,15 @@ template <class Transport>
 inline void PnP<Transport>::FAILD_WIFI()
 {
     static unsigned long lastFailTime = 0;
-    if (lastFailTime == 0)
+    static bool failWifiTimerStarted = false;
+    if (!failWifiTimerStarted)
     {
         lastFailTime = millis();
+        failWifiTimerStarted = true;
     }
-    if (millis() - lastFailTime >= 5000)
+    if ((unsigned long)(millis() - lastFailTime) >= 5000UL)
     {
-        lastFailTime = 0;
+        failWifiTimerStarted = false;
         LOG_WIFI("WIFI", "RETRYING STA CONNECTION...");
         WiFi_STATE = MODE_LOST_CONNECT_WIFI;
     }
@@ -987,12 +995,14 @@ inline void PnP<Transport>::run()
         webServer.handleClient();
         {
             static unsigned long lastAPRetry = 0;
-            if (lastAPRetry == 0)
+            static bool apRetryTimerStarted = false;
+            if (!apRetryTimerStarted)
             {
                 lastAPRetry = millis();
+                apRetryTimerStarted = true;
             }
             // Định kỳ mỗi 15 giây, tự động kiểm tra xem WiFi đã lưu có hoạt động lại không
-            if (millis() - lastAPRetry > 15000)
+            if ((unsigned long)(millis() - lastAPRetry) > 15000UL)
             {
                 lastAPRetry = millis();
                 loadWiFi();
