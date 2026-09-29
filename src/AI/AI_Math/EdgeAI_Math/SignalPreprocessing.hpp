@@ -42,11 +42,18 @@ namespace AI_Math
          */
         float update(float rawSample)
         {
+            if (isnan(rawSample))
+                return _x;
+
             // Giai đoạn 1: Dự đoán (Predict)
             _p = _p + _q;
 
-            // Giai đoạn 2: Cập nhật (Update)
-            _k = _p / (_p + _r);
+            // Giai đoạn 2: Cập nhật (Update) - Chống chia cho 0
+            float denom = _p + _r;
+            if (denom < 1e-7f)
+                return _x;
+
+            _k = _p / denom;
             _x = _x + _k * (rawSample - _x);
             _p = (1.0f - _k) * _p;
 
@@ -59,6 +66,7 @@ namespace AI_Math
             if (q <= 0.0f || r <= 0.0f)
             {
                 LOG_WARN("AI_FILTER", "Kalman parameters must be > 0 (q=%.4f, r=%.4f)", q, r);
+                return;
             }
             _q = q;
             _r = r;
@@ -69,6 +77,8 @@ namespace AI_Math
     template <size_t WindowSize>
     class CircularBuffer
     {
+        static_assert(WindowSize > 0, "CircularBuffer WindowSize must be greater than 0");
+
     private:
         float _buffer[WindowSize];
         size_t _head;

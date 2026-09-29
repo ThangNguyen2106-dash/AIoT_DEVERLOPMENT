@@ -36,7 +36,10 @@ namespace AI_Math
         // Trích xuất đặc trưng của đối tượng thành một Vector thô
         static inline void extract(const float *cleanSamples, size_t sampleCount, float *outputVector)
         {
-            if (sampleCount == 0)
+            if (outputVector == nullptr)
+                return;
+
+            if (cleanSamples == nullptr || sampleCount == 0)
             {
                 outputVector[0] = 0.0f;
                 outputVector[1] = 0.0f;
@@ -58,6 +61,10 @@ namespace AI_Math
             {
                 float val = cleanSamples[k - 1];
 
+                // Bỏ qua giá trị NaN bất thường nếu có
+                if (isnan(val))
+                    continue;
+
                 // Logic tìm cực trị cho P2P
                 if (val > maxVal)
                     maxVal = val;
@@ -74,19 +81,21 @@ namespace AI_Math
                 M2 += delta * delta2;
             }
             // --- 3. Đổ dữ liệu phẳng nối đuôi trực tiếp vào Vector đầu vào mạng AI ---
-            outputVector[0] = runningMean;                    // Chỉ số 1: Mean
-            outputVector[1] = sqrt(sumSquares / sampleCount); // Chỉ số 2: RMS
-            outputVector[2] = maxVal - minVal;                // Chỉ số 3: P2P
-            // Chỉ số 4: StdDev
+            outputVector[0] = runningMean;                     // Chỉ số 1: Mean
+            outputVector[1] = sqrtf(sumSquares / sampleCount); // Chỉ số 2: RMS (Dùng FPU phần cứng)
+            outputVector[2] = maxVal - minVal;                 // Chỉ số 3: P2P
+            // Chỉ số 4: StdDev (Kẹp dải chống NaN do làm tròn số thực âm cực nhỏ)
             float variance = (sampleCount > 1) ? (M2 / (sampleCount - 1)) : 0.0f;
-            outputVector[3] = sqrt(variance);
+            if (variance < 0.0f)
+                variance = 0.0f;
+            outputVector[3] = sqrtf(variance);
         }
 
         // Chuẩn hóa Vector đặc trưng theo chuẩn hóa Min - Max (Công thức: x_norm = (x - minVal) / (maxVal - minVal))
         __attribute__((noinline))
         static float minMaxScale(float value, float minVal, float maxVal)
         {
-            if (fabsf(maxVal - minVal) < 1e-6f)
+            if (isnan(value) || fabsf(maxVal - minVal) < 1e-6f)
                 return 0.0f;
             float scaled = (value - minVal) / (maxVal - minVal);
             if (scaled < 0.0f)
@@ -111,7 +120,7 @@ namespace AI_Math
         __attribute__((noinline))
         static float zScore(float value, float meanVal, float stdDevVal)
         {
-            if (stdDevVal < 1e-6f)
+            if (isnan(value) || stdDevVal < 1e-6f)
                 return 0.0f;
             return (value - meanVal) / stdDevVal;
         }

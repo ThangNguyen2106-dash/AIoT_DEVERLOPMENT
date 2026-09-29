@@ -39,7 +39,7 @@ namespace AI_Math
             uint32_t startTime = micros();
             size_t totalOutputs = numLabels + numCmds;
 
-            if (flattenInput == nullptr || W == nullptr || b == nullptr || totalOutputs == 0)
+            if (flattenInput == nullptr || W == nullptr || b == nullptr || totalOutputs == 0 || totalOutputs > 64)
             {
                 if (outExecutionTime != nullptr)
                     *outExecutionTime = 0;
@@ -101,12 +101,19 @@ namespace AI_Math
             }
 
             // 3. THỰC THI TOÁN HỌC NHÓM SIGMOID (Kích hoạt CMD độc lập)
+            // Kẹp dải [-16, 16] để loại trừ 100% nguy cơ tràn số float (overflow to +inf) và tăng tốc độ xử lý
             if (numCmds > 0 && outCmdsProb != nullptr)
             {
                 for (size_t i = 0; i < numCmds; i++)
                 {
                     size_t cmdLogitIndex = numLabels + i; // Trượt con trỏ đến phân vùng CMD
-                    outCmdsProb[i] = 1.0f / (1.0f + expf(-logits[cmdLogitIndex]));
+                    float z = logits[cmdLogitIndex];
+                    if (z >= 16.0f)
+                        outCmdsProb[i] = 1.0f;
+                    else if (z <= -16.0f)
+                        outCmdsProb[i] = 0.0f;
+                    else
+                        outCmdsProb[i] = 1.0f / (1.0f + expf(-z));
                 }
             }
 
