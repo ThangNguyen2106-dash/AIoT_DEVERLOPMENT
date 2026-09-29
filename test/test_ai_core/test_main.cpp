@@ -222,6 +222,91 @@ void test_edgeai_crc32_integrity(void)
 }
 
 // ==============================================================================
+// 6. UNIT TEST: KỊCH BẢN CẢM BIẾN CHẾT / ĐỨT DÂY (ZERO VARIANCE RESILIENCE)
+// ==============================================================================
+
+void test_sensor_fault_zero_variance_resilience(void)
+{
+    // Giả lập cảm biến bị đứt dây: Toàn bộ 16 mẫu đều là 0.0f
+    AI_Math::CircularBuffer<16> deadBuf;
+    for (size_t i = 0; i < 16; i++)
+    {
+        deadBuf.push(0.0f);
+    }
+
+    float featVec[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
+    AI_Math::FeatureExtractor::extract(deadBuf, featVec);
+
+    // Xác nhận: Mean, RMS, P2P, StdDev đều là 0.0f, KHÔNG ĐƯỢC sinh ra NaN hay Inf
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, featVec[0]); // Mean
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, featVec[1]); // RMS
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, featVec[2]); // P2P
+    TEST_ASSERT_EQUAL_FLOAT(0.0f, featVec[3]); // StdDev
+    TEST_ASSERT_FALSE(isnan(featVec[3]));
+
+    // Thử nghiệm chuẩn hóa Z-Score với stdDev = 0 (bảo vệ chống chia cho 0)
+    float normOut[4] = {-99.0f, -99.0f, -99.0f, -99.0f};
+    float meanZero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    float stdZero[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // stdDev = 0 (Nguy cơ chia cho 0)
+
+    AI_Math::Normalization::normalizeZScore(featVec, meanZero, stdZero, normOut, 4);
+
+    // Nhờ chốt chặn an toàn (stdDevVal < 1e-6f), kết quả phải là 0.0f an toàn thay vì NaN
+    for (size_t i = 0; i < 4; i++)
+    {
+        TEST_ASSERT_EQUAL_FLOAT(0.0f, normOut[i]);
+        TEST_ASSERT_FALSE(isnan(normOut[i]));
+        TEST_ASSERT_FALSE(isinf(normOut[i]));
+    }
+}
+
+// ==============================================================================
+// 7. UNIT TEST: KIỂM TRA RÒ RỈ BỘ NHỚ THEO THỜI GIAN (ZERO MEMORY LEAK)
+// ==============================================================================
+
+void test_long_term_zero_memory_leak(void)
+{
+    EdgeAI ai;
+    ai.begin(16, 1);
+
+    const float W[4] = {1.0f, 0.5f, -0.5f, 0.2f};
+    const float b[1] = {0.1f};
+    ai.setModel(W, b, 4, 1, 0);
+
+    // Warm up pipeline
+    for (size_t i = 0; i < 16; i++)
+    {
+        ai.push(0, 50.0f);
+    }
+    ai.predict();
+
+#if defined(ESP32)
+    uint32_t initialHeap = ESP.getFreeHeap();
+
+    // Chạy 1.000 chu kỳ suy luận liên tục
+    for (size_t iter = 0; iter < 1000; iter++)
+    {
+        ai.push(0, 50.0f + (float)(iter % 5));
+        ai.predict();
+        float conf = ai.getWinnerConfidence();
+        (void)conf;
+    }
+
+    uint32_t finalHeap = ESP.getFreeHeap();
+
+    // Khẳng định: Dung lượng Free Heap trước và sau 1.000 lần chạy phải hoàn toàn bằng nhau
+    TEST_ASSERT_EQUAL_UINT32(initialHeap, finalHeap);
+#else
+    for (size_t iter = 0; iter < 1000; iter++)
+    {
+        ai.push(0, 50.0f + (float)(iter % 5));
+        size_t res = ai.predict();
+        TEST_ASSERT_EQUAL_UINT32(0, res);
+    }
+#endif
+}
+
+// ==============================================================================
 // TEST RUNNER MAIN
 // ==============================================================================
 
@@ -238,6 +323,8 @@ void run_all_unit_tests(void)
     RUN_TEST(test_neural_engine_softmax_and_argmax);
     RUN_TEST(test_neural_engine_sigmoid_independent_commands);
     RUN_TEST(test_edgeai_crc32_integrity);
+    RUN_TEST(test_sensor_fault_zero_variance_resilience);
+    RUN_TEST(test_long_term_zero_memory_leak);
 
     UNITY_END();
 }
