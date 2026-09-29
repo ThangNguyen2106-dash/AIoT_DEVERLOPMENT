@@ -66,7 +66,6 @@ void setup()
         pinMode(BUTTON[i], INPUT);
     }
     AIoT.begin("", "", "", "");
-    AIoT.device.begin();
     AIoT.edgeAI.begin(12, 3);
 }
 

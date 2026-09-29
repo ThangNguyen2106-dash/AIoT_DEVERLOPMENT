@@ -6,7 +6,6 @@
 #include <AI/EdgeAI/EdgeAI.hpp>
 #include <AI/CloudAI/CloudAI.h>
 #include <AI/HybridAI/HybridAI.h>
-#include <Device/Device.h>
 
 class AIoTProtocol
 {
@@ -20,7 +19,6 @@ private:
     unsigned long IoT_time, IoT_set_time;
 
 public:
-    AIoTDeviceManager &device;
     EdgeAI edgeAI;
     CloudAI::GeminiClient cloudAI;
     HybridAI::Bridge hybridAI;
@@ -50,8 +48,7 @@ public:
 };
 
 inline AIoTProtocol::AIoTProtocol(/* args */)
-    : device(AIoT_Device),
-      hybridAI(&edgeAI, &cloudAI)
+    : hybridAI(&edgeAI, &cloudAI)
 {
 }
 

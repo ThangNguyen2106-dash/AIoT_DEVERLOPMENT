@@ -27,12 +27,12 @@ Hệ thống tuân thủ nghiêm ngặt nguyên lý thiết kế:
 
 ```mermaid
 flowchart TD
-    subgraph L1["TẦNG 1: THIẾT BỊ NGOẠI VI (DEVICE & SENSORS)"]
+    subgraph L1["TẦNG 1: NGOẠI VI & CẢM BIẾN (SENSORS & ACTUATORS)"]
         S0["Cảm biến Kênh 0: Rung chấn / Gia tốc"]
         S1["Cảm biến Kênh 1: Dòng điện / Điện áp"]
         S2["Cảm biến Kênh 2: Nhiệt độ môi trường"]
         S3["Cảm biến Kênh 3: Âm thanh / Áp suất"]
-        ACT["Cơ cấu chấp hành: Rơ-le, Còi báo, Đèn RGB"]
+        ACT["Cơ cấu chấp hành: GPIO, PWM, Modbus, CAN, ROS 2"]
     end
 
     subgraph L2["TẦNG 2: ĐỘNG CƠ BIÊN EDGE AI (< 0.1ms Deterministic)"]
@@ -75,9 +75,9 @@ flowchart TD
 
 ## 3. Chi Tiết Các Tầng Chức Năng
 
-### 3.1. Tầng 1: Device HAL (Hardware Abstraction Layer)
-- **ActuatorManager:** Quản lý danh sách rơ-le định danh động, hỗ trợ còi báo non-blocking (`tickBuzzer()` chống treo CPU và an toàn với hiện tượng tràn `millis()`).
-- **SensorManager:** Đọc đa kênh tương tự (ADC) và số (GPIO), hỗ trợ tự động bù sai số.
+### 3.1. Tầng 1: Ngoại Vi & Cảm Biến Tự Chủ (Sensors & Actuators Autonomy)
+- Hệ thống hỗ trợ đọc đa kênh tương tự (ADC 0..3) và các ngõ vào số trực tiếp.
+- **Triết lý tự do phần cứng (Policy-Free):** Edge AI chỉ tập trung trích xuất đặc trưng và tính toán ra quyết định xác suất (`winner_label`, `cmd_scores`). Người dùng hoàn toàn tự do điều khiển mọi cơ cấu chấp hành (Rơ-le GPIO, xung PWM động cơ, van Modbus RS485, bus CAN hoặc nút lệnh ROS 2) mà không bị gò bó bởi bất kỳ lớp bọc tĩnh nào.
 
 ### 3.2. Tầng 2: Edge AI Pipeline & Math Engine
 Đường ống toán học thời gian thực tối ưu hóa phần cứng FPU của ESP32:

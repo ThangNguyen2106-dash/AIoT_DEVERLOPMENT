@@ -67,14 +67,16 @@ void setup()
 {
     Serial.begin(115200);
 
-    // 1. Khởi tạo thiết bị phần cứng qua HAL
-    AIoT.device.begin();
-    AIoT.device.attachRelay(PIN_RELAY_FAN, "Cooling_Fan");
-    AIoT.device.attachRelay(PIN_RELAY_BUZZER, "Alarm_Buzzer");
-    AIoT.device.attachRelay(PIN_RELAY_LAMP, "Status_Lamp");
-    AIoT.device.attachRelay(PIN_RELAY_POWER, "Main_Power");
+    // 1. Cấu hình chân GPIO phần cứng trực tiếp
+    pinMode(PIN_RELAY_FAN, OUTPUT);
+    pinMode(PIN_RELAY_BUZZER, OUTPUT);
+    pinMode(PIN_RELAY_LAMP, OUTPUT);
+    pinMode(PIN_RELAY_POWER, OUTPUT);
 
-    AIoT.device.Relay(PIN_RELAY_POWER).on(); // Bật sẵn nguồn động cơ
+    digitalWrite(PIN_RELAY_POWER, HIGH); // Bật sẵn nguồn động cơ
+    digitalWrite(PIN_RELAY_FAN, LOW);
+    digitalWrite(PIN_RELAY_BUZZER, LOW);
+    digitalWrite(PIN_RELAY_LAMP, LOW);
 
     // 2. Khởi tạo Edge AI Pipeline: Cửa sổ 16 mẫu, 4 kênh cảm biến
     AIoT.edgeAI.begin(16, 4);
@@ -117,29 +119,29 @@ void loop()
         // Điều khiển bảo vệ theo trạng thái hệ thống:
         if (winner == 2) // CRITICAL_FAULT
         {
-            AIoT.device.Relay(PIN_RELAY_LAMP).on();
-            AIoT.device.Relay(PIN_RELAY_POWER).off(); // Ngắt nguồn máy khẩn cấp
+            digitalWrite(PIN_RELAY_LAMP, HIGH);
+            digitalWrite(PIN_RELAY_POWER, LOW); // Ngắt nguồn máy khẩn cấp
         }
         else if (winner == 1) // WARNING
         {
-            AIoT.device.Relay(PIN_RELAY_LAMP).on();
+            digitalWrite(PIN_RELAY_LAMP, HIGH);
         }
         else
         {
-            AIoT.device.Relay(PIN_RELAY_LAMP).off();
+            digitalWrite(PIN_RELAY_LAMP, LOW);
         }
 
         // Điều khiển quạt độc lập theo điểm xác suất Sigmoid
         if (fanScore >= 0.60f)
-            AIoT.device.Relay(PIN_RELAY_FAN).on();
+            digitalWrite(PIN_RELAY_FAN, HIGH);
         else
-            AIoT.device.Relay(PIN_RELAY_FAN).off();
+            digitalWrite(PIN_RELAY_FAN, LOW);
 
         // Điều khiển còi độc lập
         if (buzzerScore >= 0.75f)
-            AIoT.device.Relay(PIN_RELAY_BUZZER).on();
+            digitalWrite(PIN_RELAY_BUZZER, HIGH);
         else
-            AIoT.device.Relay(PIN_RELAY_BUZZER).off();
+            digitalWrite(PIN_RELAY_BUZZER, LOW);
     }
 
     delay(20); // Chu kỳ lấy mẫu 50Hz (20ms)

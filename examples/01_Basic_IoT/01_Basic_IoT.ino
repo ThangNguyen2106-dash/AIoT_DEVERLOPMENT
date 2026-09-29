@@ -1,11 +1,11 @@
 /**
  * ==============================================================================
- * VÍ DỤ 01: BASIC IOT & DEVICE HAL
+ * VÍ DỤ 01: BASIC IOT & TELEMETRY STREAM
  * ==============================================================================
  * Hướng dẫn sử dụng tầng cơ sở của AIoT Platform:
- * 1. Khởi tạo Hardware Abstraction Layer (HAL) qua AIoT.device
- * 2. Gắn và điều khiển Rơ-le (Relay) an toàn
- * 3. Gửi dữ liệu Telemetry lên Cloud / MQTT Dashboard
+ * 1. Khởi tạo kết nối mạng và MQTT
+ * 2. Đọc cảm biến và điều khiển chân GPIO chuẩn
+ * 3. Gửi dữ liệu Telemetry thời gian thực lên Cloud / MQTT Dashboard
  * ==============================================================================
  */
 
@@ -17,26 +17,27 @@
 #define PIN_RELAY_LIGHT 12  // Rơ-le 1: Đèn chiếu sáng
 #define PIN_RELAY_PUMP  13  // Rơ-le 2: Máy bơm nước
 
+bool relayLightState = false;
+
 void setup()
 {
     Serial.begin(115200);
 
-    // 1. Khởi tạo tầng phần cứng HAL
-    AIoT.device.begin();
+    // 1. Cấu hình chân GPIO phần cứng trực tiếp
+    pinMode(PIN_RELAY_LIGHT, OUTPUT);
+    pinMode(PIN_RELAY_PUMP, OUTPUT);
 
-    // 2. Gắn các thiết bị Rơ-le vào HAL
-    AIoT.device.attachRelay(PIN_RELAY_LIGHT, "Main_Light");
-    AIoT.device.attachRelay(PIN_RELAY_PUMP, "Water_Pump");
+    // Khởi tạo trạng thái ban đầu
+    digitalWrite(PIN_RELAY_LIGHT, HIGH);
+    relayLightState = true;
+    digitalWrite(PIN_RELAY_PUMP, LOW);
 
-    // Thử nghiệm bật rơ-le đèn khi khởi động
-    AIoT.device.Relay(PIN_RELAY_LIGHT).on();
-
-    Serial.println(F("[SYSTEM] Basic IoT HAL Initialized!"));
+    Serial.println(F("[SYSTEM] Basic IoT Initialized!"));
 }
 
 void loop()
 {
-    // Duy trì các tác vụ nền của giao thức AIoT (WiFi, MQTT, HAL)
+    // Duy trì các tác vụ nền của giao thức AIoT (WiFi, MQTT)
     AIoT.run();
 
     static unsigned long lastSend = 0;
@@ -51,11 +52,11 @@ void loop()
         // Bắn telemetry lên Dashboard
         AIoT.updateTelemetry("temp_c", ambientTemp);
         AIoT.updateTelemetry("light_adc", lightIntensity);
-        AIoT.updateTelemetry("relay_light_state", AIoT.device.Relay(PIN_RELAY_LIGHT).getState());
+        AIoT.updateTelemetry("relay_light_state", relayLightState);
 
         Serial.printf("[TELEMETRY] Temp: %.1f C | Light: %d | Relay: %s\n",
                       ambientTemp, lightIntensity,
-                      AIoT.device.Relay(PIN_RELAY_LIGHT).getState() ? "ON" : "OFF");
+                      relayLightState ? "ON" : "OFF");
     }
 
     delay(10);

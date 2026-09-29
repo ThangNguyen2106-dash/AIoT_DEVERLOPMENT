@@ -19,7 +19,7 @@
 
 1. [Giới Thiệu & Triết Lý Thiết Kế](#1-giới-thiệu--triết-lý-thiết-kế)
 2. [Kiến Trúc 4 Phân Hệ Cốt Lõi (Architecture)](#2-kiến-trúc-4-phân-hệ-cốt-lõi)
-   - [Phân hệ 1: Device HAL & IoT Core (`AIoT.device`)](#phân-hệ-1-device-hal--iot-core-aiotdevice)
+   - [Phân hệ 1: Lõi IoT & Mạng Truyền Thông (`AIoT.*`)](#phân-hệ-1-lõi-iot--mạng-truyền-thông-aiot)
    - [Phân hệ 2: Toàn trình Edge AI & NVS Flash (`AIoT.edgeAI`)](#phân-hệ-2-toàn-trình-edge-ai--nvs-flash-aiotedgeai)
    - [Phân hệ 3: Trí Tuệ Đám Mây (`AIoT.cloudAI`)](#phân-hệ-3-trí-tuệ-đám-mây-aiotcloudai)
    - [Phân hệ 4: Cầu Nối Điện Toán Lai (`AIoT.hybridAI`)](#phân-hệ-4-cầu-nối-điện-toán-lai-aiothybridai)
@@ -90,11 +90,11 @@ flowchart TD
     Broker -.-> Bridge
 ```
 
-### Phân hệ 1: Device HAL & IoT Core (`AIoT.device`)
-- Quản lý chân động (Dynamic Pin Mapping), đăng ký Rơ-le, còi hú, đèn LED bằng nhãn chuỗi.
-- Tích hợp còi báo non-blocking (`buzzerBeep()` kết hợp `tickBuzzer()`), bảo vệ chống tràn thời gian `millis()` sau 49.7 ngày hoạt động liên tục.
-- Captive Portal phục vụ cấu hình WiFi & MQTT nội bộ qua cổng 80 khi thiết bị mất mạng.
+### Phân hệ 1: Lõi IoT & Mạng Truyền Thông (`AIoT.*`)
+- Kết nối WiFi tự động & Captive Portal phục vụ cấu hình tham số nội bộ qua cổng 80 khi thiết bị mất mạng.
 - Giao tiếp bảo mật hai chiều qua HiveMQ Cloud TLS Port 8883.
+- Hỗ trợ gửi Telemetry định kỳ và xử lý callback dữ liệu thời gian thực.
+- Thiết kế phi ràng buộc (Policy-Free): Người dùng toàn quyền sử dụng GPIO/ADC chuẩn của Arduino hoặc xuất lệnh điều khiển ra các bus công nghiệp (Modbus, CAN, PWM, ROS 2...).
 
 ### Phân hệ 2: Toàn trình Edge AI & NVS Flash (`AIoT.edgeAI`)
 - **Giai đoạn 1 (Lọc & Đệm):** Bộ lọc Kalman 1D khử nhiễu đo kết hợp bộ đệm vòng `CircularBuffer` lưu trữ cửa sổ trượt 16 đến 32 mẫu.
@@ -176,8 +176,8 @@ Thư viện bao gồm các mô-đun toán học độc lập trong `src/AI/AI_Ma
 Thư mục `examples/` đi kèm 5 ví dụ thực tế có thể nạp chạy ngay:
 
 ### [1. `01_Basic_IoT.ino`](examples/01_Basic_IoT/01_Basic_IoT.ino)
-- **Mục đích:** Làm quen với phần cứng HAL và gửi telemetry cơ bản.
-- **Tính năng:** Đăng ký rơ-le qua `AIoT.device.attachRelay()`, bật/tắt rơ-le, đọc cảm biến và gửi lên MQTT qua `AIoT.updateTelemetry()`.
+- **Mục đích:** Kết nối mạng và truyền thông Telemetry thời gian thực.
+- **Tính năng:** Điều khiển GPIO chuẩn, đọc cảm biến và gửi dữ liệu lên MQTT Dashboard qua `AIoT.updateTelemetry()`.
 
 ### [2. `02_Edge_AI_Pipeline.ino`](examples/02_Edge_AI_Pipeline/02_Edge_AI_Pipeline.ino)
 - **Mục đích:** Toàn trình thu thập, lọc và suy luận Edge AI 4 kênh cảm biến.
@@ -221,14 +221,14 @@ Chương trình test tự động kiểm tra toàn bộ tính chính xác của:
 
 Tất cả các tính năng đều được truy cập thông qua đối tượng toàn cục duy nhất **`AIoT`**:
 
-### Nhóm 1: Quản lý Thiết bị Ngoại Vi (`AIoT.device.*`)
+### Nhóm 1: Quản lý Hệ Thống & Truyền Thông IoT (`AIoT.*`)
 ```cpp
-AIoT.device.begin();                                     // Khởi động HAL
-AIoT.device.attachRelay(pin, "Tên");                     // Gắn Rơ-le vào chân GPIO
-AIoT.device.Relay(pin).on();                             // Bật Rơ-le
-AIoT.device.Relay(pin).off();                            // Tắt Rơ-le
-bool state = AIoT.device.Relay(pin).getState();          // Lấy trạng thái hiện tại
-AIoT.device.buzzerBeep(100);                             // Kêu còi 100ms (Non-blocking)
+AIoT.begin(ssid, pass);                                  // Khởi động kết nối WiFi & Captive Portal
+AIoT.begin(ssid, pass, mqttUser, mqttPass);              // Kết nối WiFi + MQTT TLS HiveMQ
+AIoT.run();                                              // Duy trì vòng lặp nền trong loop()
+AIoT.updateTelemetry("temp", 28.5);                      // Cập nhật giá trị telemetry
+AIoT.sendTelemetry();                                    // Đẩy dữ liệu ngay lên MQTT Dashboard
+bool connected = AIoT.CheckConnect();                    // Kiểm tra trạng thái kết nối mạng
 ```
 
 ### Nhóm 2: Lõi Suy Luận Edge AI (`AIoT.edgeAI.*`)

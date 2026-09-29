@@ -37,8 +37,6 @@ void setup()
 {
     Serial.begin(115200);
 
-    // [A] Khởi tạo thiết bị phần cứng
-    AIoT.device.begin();
     AIoT.edgeAI.begin(16, 4); // 4 kênh, cửa sổ 16 mẫu
 
     // [B] Cơ chế nạp 2 tầng (NVS Flash vs Factory Default)

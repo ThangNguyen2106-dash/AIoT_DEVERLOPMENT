@@ -32,7 +32,6 @@ void setup()
 {
     Serial.begin(115200);
 
-    AIoT.device.begin();
     AIoT.edgeAI.begin(16, 1); // 1 kênh cảm biến, cửa sổ 16 mẫu
 
     // =========================================================================
