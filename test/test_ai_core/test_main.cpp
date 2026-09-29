@@ -251,7 +251,7 @@ void test_sensor_fault_zero_variance_resilience(void)
     float meanZero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
     float stdZero[4] = {0.0f, 0.0f, 0.0f, 0.0f}; // stdDev = 0 (Nguy cơ chia cho 0)
 
-    AI_Math::Normalization::normalizeZScore(featVec, meanZero, stdZero, normOut, 4);
+    AI_Math::FeatureExtractor::normalizeZScore(featVec, meanZero, stdZero, normOut, 4);
 
     // Nhờ chốt chặn an toàn (stdDevVal < 1e-6f), kết quả phải là 0.0f an toàn thay vì NaN
     for (size_t i = 0; i < 4; i++)
