@@ -10,7 +10,6 @@
   <img src="https://img.shields.io/badge/Edge%20AI-Kalman%20%7C%20Z--Score%20%7C%20Multi--Task%20Neural-red?style=for-the-badge" alt="Edge AI" />
   <img src="https://img.shields.io/badge/Adaptive%20Storage-NVS%20Flash%20CRC32-yellow?style=for-the-badge" alt="NVS Storage" />
   <img src="https://img.shields.io/badge/Cloud%20AI-Google%20Gemini%20Flash-purple?style=for-the-badge&logo=google" alt="Cloud AI" />
-  <img src="https://img.shields.io/badge/License-GPLv3-blue?style=for-the-badge" alt="License" />
 </p>
 
 ---
@@ -26,7 +25,6 @@
 3. [Quy Chuẩn Dữ Liệu 2 Chiều (Data Contracts)](#3-quy-chuẩn-dữ-liệu-2-chiều-data-contracts)
 4. [Hướng Dẫn Bộ Ví Dụ Mẫu (Examples Guide)](#4-hướng-dẫn-bộ-ví-dụ-mẫu-examples-guide)
 5. [Cẩm Nang Tra Cứu API Đầy Đủ (API Reference)](#5-cẩm-nang-tra-cứu-api-đầy-đủ-api-reference)
-6. [Tác Quyền & Giấy Phép (License)](#6-tác-quyền--giấy-phép-license)
 
 ---
 
@@ -232,10 +230,3 @@ bool synced = AIoT.hybridAI.syncModelFromJson(jsonStr);  // Giải mã JSON tr�
 String diag = AIoT.hybridAI.consultCloud("Câu hỏi");     // Tự động gom 16 đặc trưng gửi Gemini chẩn đoán
 ```
 
----
-
-## 6. Tác Quyền & Giấy Phép (License)
-
-Dự án được phát triển bởi **Thắng Nguyễn** và phát hành dưới giấy phép **GNU General Public License v3.0 (GPLv3)**.
-Mọi người có quyền tự do sử dụng, nghiên cứu, sửa đổi và đóng góp mã nguồn cho cộng đồng.
-Chi tiết xem tại file [LICENSE](LICENSE).
