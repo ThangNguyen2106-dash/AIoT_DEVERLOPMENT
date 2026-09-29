@@ -1,7 +1,7 @@
-# Thư Viện AIoT (AIoT_LIB)
+# Thư Viện AIoT (AIoT_LIB) - Hybrid AI v2.0
 
 <p align="center">
-  <b>Framework AIoT Mã Nguồn Mở Hiệu Năng Cao Cho Các Dòng Vi Điều Khiển ESP32 (ESP32 Classic / ESP32-S3) & Cloud AI</b>
+  <b>Framework AIoT Hiệu Năng Cao Cho Các Dòng Vi Điều Khiển ESP32 (ESP32 Classic / ESP32-S3 / ESP32-C3) & Cloud AI</b>
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
   <img src="https://img.shields.io/badge/Edge%20AI-Kalman%20%7C%20Z--Score%20%7C%20Multi--Task%20Neural-red?style=for-the-badge" alt="Edge AI" />
   <img src="https://img.shields.io/badge/Adaptive%20Storage-NVS%20Flash%20CRC32-yellow?style=for-the-badge" alt="NVS Storage" />
   <img src="https://img.shields.io/badge/Cloud%20AI-Google%20Gemini%20Flash-purple?style=for-the-badge&logo=google" alt="Cloud AI" />
+  <img src="https://img.shields.io/badge/Architecture-Hybrid%20AI%20v2.0-brightgreen?style=for-the-badge" alt="Hybrid AI v2" />
 </p>
 
 ---
@@ -22,21 +23,23 @@
    - [Phân hệ 2: Toàn trình Edge AI & NVS Flash (`AIoT.edgeAI`)](#phân-hệ-2-toàn-trình-edge-ai--nvs-flash-aiotedgeai)
    - [Phân hệ 3: Trí Tuệ Đám Mây (`AIoT.cloudAI`)](#phân-hệ-3-trí-tuệ-đám-mây-aiotcloudai)
    - [Phân hệ 4: Cầu Nối Điện Toán Lai (`AIoT.hybridAI`)](#phân-hệ-4-cầu-nối-điện-toán-lai-aiothybridai)
-3. [Quy Chuẩn Dữ Liệu 2 Chiều (Data Contracts)](#3-quy-chuẩn-dữ-liệu-2-chiều-data-contracts)
-4. [Hướng Dẫn Bộ Ví Dụ Mẫu (Examples Guide)](#4-hướng-dẫn-bộ-ví-dụ-mẫu-examples-guide)
-5. [Cẩm Nang Tra Cứu API Đầy Đủ (API Reference)](#5-cẩm-nang-tra-cứu-api-đầy-đủ-api-reference)
+3. [Lõi Thuật Toán Toán Học & Chốt Chặn An Toàn (AI Math)](#3-lõi-thuật-toán-toán-học--chốt-chặn-an-toàn)
+4. [Quy Chuẩn Dữ Liệu 2 Chiều (Data Contracts)](#4-quy-chuẩn-dữ-liệu-2-chiều-data-contracts)
+5. [Hướng Dẫn Bộ Ví Dụ Mẫu (Examples Guide)](#5-hướng-dẫn-bộ-ví-dụ-mẫu-examples-guide)
+6. [Công Cụ Huấn Luyện & Kiểm Thử Tự Động (Tools & Testing)](#6-công-cụ-huấn-luyện--kiểm-thử-tự-động)
+7. [Cẩm Nang Tra Cứu API Đầy Đủ (API Reference)](#7-cẩm-nang-tra-cứu-api-đầy-đủ-api-reference)
 
 ---
 
 ## 1. Giới Thiệu & Triết Lý Thiết Kế
 
-Trong các hệ thống công nghiệp hiện đại, việc ứng dụng AI đối mặt với hai thách thức:
-- **Xử lý tại biên (Edge AI)** đòi hỏi tốc độ siêu nhanh ($< 0.1\text{ms}$) để ngắt máy bảo vệ an toàn khi có sự cố, nhưng tài nguyên RAM/Flash trên chip bị giới hạn và không thể tự phân tích chẩn đoán ngữ nghĩa phức tạp.
-- **Xử lý đám mây (Cloud AI - Google Gemini)** có năng lực tư duy, chẩn đoán sâu và hỗ trợ đa ngôn ngữ, nhưng lại có độ trễ mạng ($1 - 3\text{s}$) và phụ thuộc vào kết nối Internet.
+Trong các hệ thống công nghiệp và IoT thông minh, bài toán xử lý trí tuệ nhân tạo luôn đối mặt với hai thách thức:
+- **Xử lý tại biên (Edge AI):** Đòi hỏi tốc độ siêu nhanh ($< 0.1\text{ ms}$) để bảo vệ thiết bị tức thì khi xảy ra sự cố, nhưng tài nguyên RAM/Flash trên chip bị giới hạn và không thể tự phân tích chẩn đoán ngữ nghĩa phức tạp.
+- **Xử lý đám mây (Cloud AI - Google Gemini):** Có năng lực tư duy, chẩn đoán sâu và hỗ trợ ngôn ngữ tự nhiên, nhưng lại có độ trễ mạng ($1 - 3\text{ s}$) và phụ thuộc vào kết nối Internet.
 
-**AIoT_LIB** giải quyết triệt để bài toán này theo triết lý:
+**AIoT_LIB** giải quyết triệt để bài toán này theo mô hình **Hybrid AI v2.0**:
 > **"Tách rời Cơ chế khỏi Chính sách (Separate Mechanism from Policy)"**  
-> *Thư viện chỉ cung cấp các công cụ (Mechanism) mạnh mẽ, chuẩn hóa và tối ưu nhất; người dùng toàn quyền quyết định tình huống (Policy) vận hành trong mã nguồn ứng dụng.*
+> *Thư viện cung cấp toàn bộ đường ống toán học, nơ-ron, bộ nhớ NVS và giao tiếp đám mây chuẩn hóa; người dùng toàn quyền quyết định chính sách vận hành trong mã nguồn ứng dụng.*
 
 Thư viện tương thích **100% với cả ESP32 thường (WROOM-32, NodeMCU ESP32) lẫn ESP32-S3 / ESP32-C3**, không phụ thuộc thư viện ngoài, tối ưu RAM chỉ tốn **~54 KB** và Flash **~970 KB**.
 
@@ -74,8 +77,8 @@ flowchart TD
 
     subgraph ACTUATORS["CƠ CẤU CHẤP HÀNH (HAL)"]
         R0["Quạt giải nhiệt"]
-        R1["Còi báo động"]
-        R2["Đèn trạng thái"]
+        R1["Còi báo động (Non-blocking)"]
+        R2["Đèn trạng thái RGB"]
         R3["Cắt nguồn khẩn cấp"]
     end
 
@@ -88,8 +91,9 @@ flowchart TD
 ```
 
 ### Phân hệ 1: Device HAL & IoT Core (`AIoT.device`)
-- Quản lý chân động (Dynamic Pin Mapping), đăng ký Rơ-le, còi hú, đèn LED bằng nhãn văn bản.
-- Tích hợp Captive Portal phục vụ cấu hình WiFi & MQTT nội bộ qua cổng 80 khi thiết bị mất mạng.
+- Quản lý chân động (Dynamic Pin Mapping), đăng ký Rơ-le, còi hú, đèn LED bằng nhãn chuỗi.
+- Tích hợp còi báo non-blocking (`buzzerBeep()` kết hợp `tickBuzzer()`), bảo vệ chống tràn thời gian `millis()` sau 49.7 ngày hoạt động liên tục.
+- Captive Portal phục vụ cấu hình WiFi & MQTT nội bộ qua cổng 80 khi thiết bị mất mạng.
 - Giao tiếp bảo mật hai chiều qua HiveMQ Cloud TLS Port 8883.
 
 ### Phân hệ 2: Toàn trình Edge AI & NVS Flash (`AIoT.edgeAI`)
@@ -98,22 +102,37 @@ flowchart TD
   $$\text{Mean} = \frac{1}{N}\sum x_i, \quad \text{RMS} = \sqrt{\frac{1}{N}\sum x_i^2}, \quad \text{P2P} = \max(x) - \min(x), \quad \text{StdDev} = \sqrt{\frac{1}{N}\sum(x_i - \mu)^2}$$
   Hỗ trợ chuẩn hóa Z-Score $z = \frac{x - \mu}{\sigma}$ và Min-Max $x' = \frac{x - \min}{\max - \min}$.
 - **Giai đoạn 3 (Mạng nơ-ron đa mục tiêu):** Thực thi đồng thời phân loại nhãn loại trừ qua **Softmax** và tính điểm số độc lập cho từng cơ cấu chấp hành qua **Sigmoid**.
-- **Giai đoạn 4 (Kho lưu trữ thích nghi NVS Flash):** Tự động băm CRC32 kiểm tra toàn vẹn, hỗ trợ nạp mô hình thích nghi từ Flash, nạp nóng không cần khởi động lại, và fallback an toàn về cấu hình xuất xưởng.
+- **Giai đoạn 4 (Kho lưu trữ thích nghi NVS Flash):** Tự động băm CRC32 kiểm tra toàn vẹn, nạp mô hình thích nghi từ Flash, nạp nóng không cần khởi động lại chip, và fallback an toàn về cấu hình xuất xưởng.
 
 ### Phân hệ 3: Trí Tuệ Đám Mây (`AIoT.cloudAI`)
 - Module `GeminiClient` gọi trực tiếp Google Gemini qua HTTPS (`gemini-1.5-flash`, `gemini-2.0-flash`).
-- Tự động kích hoạt DNS Fallback (8.8.8.8), chống lỗi kết nối và quản lý hạn mức quota 429.
-- Cho phép trò chuyện tự do hoặc nhận prompt chẩn đoán kỹ thuật.
+- Tự động kích hoạt DNS Fallback (8.8.8.8), chống lỗi kết nối mạng và quản lý hạn mức quota (HTTP 429).
+- Cho phép nhận prompt chẩn đoán kỹ thuật kết hợp dữ liệu đặc trưng trực tiếp từ biên.
 
 ### Phân hệ 4: Cầu Nối Điện Toán Lai (`AIoT.hybridAI`)
-- Đóng vai trò là cầu nối dữ liệu hai chiều:
+- Đóng vai trò là cầu nối dữ liệu hai chiều (Bridge):
   - **Chiều lên (Uplink):** Tự động đóng gói 16 đặc trưng + nhãn + điểm số thành chuỗi JSON chuẩn.
   - **Chiều xuống (Downlink):** Nhận JSON chứa $W, b$, Z-Score từ Cloud $\rightarrow$ gọi `saveToNVS()` nạp đè vào Flash tức thì.
-  - **Chẩn đoán phối hợp:** Tự động kẹp 16 đặc trưng hiện tại vào câu hỏi gửi lên Gemini.
+  - **Chẩn đoán phối hợp:** Tự động kẹp 16 đặc trưng hiện tại vào câu hỏi gửi lên Gemini khi độ tin cậy rớt dưới ngưỡng.
 
 ---
 
-## 3. Quy Chuẩn Dữ Liệu 2 Chiều (Data Contracts)
+## 3. Lõi Thuật Toán Toán Học & Chốt Chặn An Toàn
+
+Thư viện bao gồm các mô-đun toán học độc lập trong `src/AI/AI_Math/EdgeAI_Math/`:
+- **`AI_KNN.h`:** Thuật toán K láng giềng gần nhất (K-Nearest Neighbors) tính khoảng cách Euclid và bỏ phiếu đa số.
+- **`AI_LinearRegression.h`:** Hồi quy tuyến tính đa biến (Multivariate Linear Regression).
+- **`AI_LogisticRegression.h`:** Hồi quy Logistic đa lớp (Softmax) và nhị phân (Sigmoid).
+
+### Các chốt chặn ổn định số học (Numerical Stability Guards):
+1. **Lọc NaN/Inf (Sanitization):** Tự động quét và triệt tiêu giá trị bất thường (`isnan`, `isinf`) trước khi đưa vào tính toán.
+2. **Bảo vệ căn bậc hai:** Đảm bảo phương sai không âm $\sigma = \sqrt{\max(0.0f, \text{Variance})}$ trước khi tính `sqrtf`.
+3. **Kẹp biên Sigmoid (Clamped Sigmoid):** Kẹp giá trị $z \in [-40.0, +40.0]$ ngăn ngừa tràn số `expf()` gây sập hệ thống.
+4. **Ổn định số học Softmax:** Trừ giá trị cực đại ($z'_i = z_i - \max(z)$) để triệt tiêu hiện tượng overflow trong hàm số mũ, đồng thời cộng epsilon $\epsilon = 10^{-7}$ chống chia cho 0.
+
+---
+
+## 4. Quy Chuẩn Dữ Liệu 2 Chiều (Data Contracts)
 
 ### Bản tin Chiều lên: Telemetry Uplink (ESP32 $\rightarrow$ Cloud / MQTT)
 Được sinh tự động bởi hàm `AIoT.hybridAI.serializeTelemetry()`:
@@ -143,7 +162,7 @@ flowchart TD
   "num_labels": 3,
   "num_cmds": 2,
   "norm_type": 2,
-  "W": [-0.5, -0.6, ...],
+  "W": [-0.5, -0.6, 0.12, 0.45, ...],
   "b": [0.5, -0.2, -1.0, -0.6, -1.5],
   "norm1": [25.0, 26.0, 5.0, 1.2, 10.0, ...],
   "norm2": [4.5, 4.8, 1.5, 0.4, 2.0, ...]
@@ -152,7 +171,7 @@ flowchart TD
 
 ---
 
-## 4. Hướng Dẫn Bộ Ví Dụ Mẫu (Examples Guide)
+## 5. Hướng Dẫn Bộ Ví Dụ Mẫu (Examples Guide)
 
 Thư mục `examples/` đi kèm 5 ví dụ thực tế có thể nạp chạy ngay:
 
@@ -178,7 +197,27 @@ Thư mục `examples/` đi kèm 5 ví dụ thực tế có thể nạp chạy ng
 
 ---
 
-## 5. Cẩm Nang Tra Cứu API Đầy Đủ (API Reference)
+## 6. Công Cụ Huấn Luyện & Kiểm Thử Tự Động
+
+### Huấn luyện ngoại tuyến (`tools/Edge_ai_train.py`)
+Script Python hỗ trợ huấn luyện mô hình Logistic Regression đa nhiệm từ tập dữ liệu CSV cảm biến:
+```bash
+py tools/Edge_ai_train.py
+```
+- Tự động chuẩn hóa dữ liệu (Z-Score hoặc Min-Max).
+- Tự động sinh mã nguồn C++ sẵn sàng sao chép vào hàm `setup()` của Arduino/ESP32.
+- Xuất file JSON Downlink chuẩn để gửi cập nhật mô hình từ xa qua MQTT.
+
+### Bộ kiểm thử đơn vị (`test/test_ai_core/test_main.cpp`)
+Chương trình test tự động kiểm tra toàn bộ tính chính xác của:
+- Bộ lọc Kalman 1D và bộ đệm vòng.
+- Tính toán 16 đặc trưng thống kê.
+- Các chốt chặn số học (NaN, Inf, Overflow, Underflow).
+- Suy luận nơ-ron đa nhiệm và cơ chế CRC32.
+
+---
+
+## 7. Cẩm Nang Tra Cứu API Đầy Đủ (API Reference)
 
 Tất cả các tính năng đều được truy cập thông qua đối tượng toàn cục duy nhất **`AIoT`**:
 
@@ -189,6 +228,7 @@ AIoT.device.attachRelay(pin, "Tên");                     // Gắn Rơ-le vào c
 AIoT.device.Relay(pin).on();                             // Bật Rơ-le
 AIoT.device.Relay(pin).off();                            // Tắt Rơ-le
 bool state = AIoT.device.Relay(pin).getState();          // Lấy trạng thái hiện tại
+AIoT.device.buzzerBeep(100);                             // Kêu còi 100ms (Non-blocking)
 ```
 
 ### Nhóm 2: Lõi Suy Luận Edge AI (`AIoT.edgeAI.*`)
@@ -229,4 +269,3 @@ String json = AIoT.hybridAI.serializeTelemetry(mac);     // Đóng gói 16 đặ
 bool synced = AIoT.hybridAI.syncModelFromJson(jsonStr);  // Giải mã JSON trọng số mới và nạp thẳng vào NVS
 String diag = AIoT.hybridAI.consultCloud("Câu hỏi");     // Tự động gom 16 đặc trưng gửi Gemini chẩn đoán
 ```
-
