@@ -13,7 +13,8 @@
 
 #include <Arduino.h>
 #include <unity.h>
-#include <AIoT.h>
+#include <AI/AI_Math/AI_Math.h>
+#include <AI/EdgeAI/EdgeAI.hpp>
 
 void setUp(void)
 {
