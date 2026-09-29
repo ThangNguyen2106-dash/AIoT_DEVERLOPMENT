@@ -13,8 +13,7 @@
 
 #include <Arduino.h>
 #include <unity.h>
-#include <AI/AI_Math/AI_Math.h>
-#include <AI/EdgeAI/EdgeAI.hpp>
+#include <AIoT.h>
 
 void setUp(void)
 {
@@ -234,8 +233,11 @@ void test_sensor_fault_zero_variance_resilience(void)
         deadBuf.push(0.0f);
     }
 
+    float deadSamples[16];
+    deadBuf.toArray(deadSamples);
+
     float featVec[4] = {-1.0f, -1.0f, -1.0f, -1.0f};
-    AI_Math::FeatureExtractor::extract(deadBuf, featVec);
+    AI_Math::FeatureExtractor::extract(deadSamples, 16, featVec);
 
     // Xác nhận: Mean, RMS, P2P, StdDev đều là 0.0f, KHÔNG ĐƯỢC sinh ra NaN hay Inf
     TEST_ASSERT_EQUAL_FLOAT(0.0f, featVec[0]); // Mean
