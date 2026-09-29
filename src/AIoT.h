@@ -2,5 +2,5 @@
 #define INC_AIOT_LIB
 
 #include <AIoT.hpp>
-#include <Ultility/Communicate/MODBUS/modbus.h>
+#include <Utility/Communicate/MODBUS/modbus.h>
 #endif /*INC_AIOT_LIB*/

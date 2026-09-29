@@ -5,7 +5,7 @@
 #define INC_API_HPP_
 
 #include <IoT/Topic.h>
-#include <Ultility/Param/cJSON.hpp>
+#include <Utility/Param/cJSON.hpp>
 #include <IoT/Param.hpp>
 #include <IoT/Handler.hpp>
 
