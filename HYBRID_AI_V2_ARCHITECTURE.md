@@ -27,20 +27,22 @@ Hệ thống tuân thủ nghiêm ngặt nguyên lý thiết kế:
 
 ```mermaid
 flowchart TD
-    subgraph L1["TẦNG 1: NGOẠI VI & CẢM BIẾN (SENSORS & ACTUATORS)"]
-        S0["Cảm biến Kênh 0: Rung chấn / Gia tốc"]
-        S1["Cảm biến Kênh 1: Dòng điện / Điện áp"]
-        S2["Cảm biến Kênh 2: Nhiệt độ môi trường"]
-        S3["Cảm biến Kênh 3: Âm thanh / Áp suất"]
-        ACT["Cơ cấu chấp hành: GPIO, PWM, Modbus, CAN, ROS 2"]
+    subgraph L1["TẦNG 1: THU THẬP TÍN HIỆU ĐA KÊNH & THI HÀNH (DATA ACQUISITION & ACTUATION)"]
+        CH0["Kênh 0: Signal Stream $x_0(t)$"]
+        CH1["Kênh 1: Signal Stream $x_1(t)$"]
+        CH2["Kênh 2: Signal Stream $x_2(t)$"]
+        CHk["Kênh $k$: Signal Stream $x_k(t)$"]
+        Sources["Nguồn dữ liệu: Analog ADC, Modbus RTU/TCP, CAN Bus, I2C, SPI, Sensors"]
+        Sources -.-> CH0 & CH1 & CH2 & CHk
+        ACT["Cơ cấu chấp hành & Đáp ứng: Relay, PWM, Biến tần, CAN/Modbus Command"]
     end
 
     subgraph L2["TẦNG 2: ĐỘNG CƠ BIÊN EDGE AI (< 0.1ms Deterministic)"]
         Kalman["Bộ lọc Kalman 1D (Khử nhiễu đo)"]
         Buf["CircularBuffer (Cửa sổ trượt 16 - 32 mẫu)"]
-        Feat["Trích xuất đặc trưng: Mean, RMS, P2P, StdDev"]
+        Feat["Trích xuất đặc trưng vật lý: Mean, RMS, P2P, StdDev"]
         Norm["Chuẩn hóa thích nghi: Z-Score / Min-Max"]
-        Engine["Mạng nơ-ron đa mục tiêu: Softmax + Sigmoids"]
+        Engine["Mạng nơ-ron đa mục tiêu: Softmax (Labels) + Sigmoids (Cmds)"]
         NVS[("NVS Flash Storage (CRC32 Checksum / Hot-Reload)")]
         
         Kalman --> Buf --> Feat --> Norm --> Engine
@@ -63,7 +65,7 @@ flowchart TD
         ROS["ROS 2 Boundary (Tùy chọn tích hợp)"]
     end
 
-    L1 -->|"Đọc mẫu ADC thô"| Kalman
+    L1 -->|"Chuỗi mẫu đo thời gian thực"| Kalman
     Engine -->|"Kích hoạt tức thì (< 0.1ms)"| ACT
     Engine -->|"Đặc trưng + Độ tin cậy"| Bridge
     Bridge -->|"Uplink JSON Telemetry"| MQTT
