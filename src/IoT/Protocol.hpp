@@ -28,7 +28,8 @@ public:
     void begin(const char *sta_ssid, const char *sta_pass);
     void begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_id, const char *mqtt_auth);
     void run();
-
+    bool _networkEnabled = true;
+    void enableNetwork(bool enable) { _networkEnabled = enable; }
     void setUserConfiguring(bool configuring);
     bool isUserConfiguring() const;
     WIFI_STATE getWiFiState() const;
@@ -279,8 +280,11 @@ inline WIFI_STATE AIoTProtocol::getWiFiState() const
 
 inline void AIoTProtocol::run()
 {
-    this->PNP.run();
-    this->timeEvented();
+    if (_networkEnabled)
+    {
+        this->PNP.run(); // Chỉ chạy Wi-Fi/MQTT khi được phép
+    }
+    this->timeEvented(); // Bộ lập lịch thì luôn luôn chạy
 }
 
 typedef AIoTProtocol PROTOCOL;
