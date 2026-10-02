@@ -97,13 +97,18 @@ void NormamlState()
 
 void loop()
 {
+    AIoT.run();
     handleButton();
-    switch (mode)
+
+    static unsigned long lastRun = 0;
+    if (millis() - lastRun >= 1000)
     {
-    case 0:
-        NormamlState();
-        delay(1000);
-        break;
+        lastRun = millis();
+        switch (mode)
+        {
+        case 0:
+            NormamlState();
+            break;
+        }
     }
 }
-

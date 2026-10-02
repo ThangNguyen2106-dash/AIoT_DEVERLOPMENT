@@ -12,8 +12,6 @@
 #include <esp_netif.h>
 
 #define WIFI_AP_Subnet IPAddress(255, 255, 255, 0)
-char STA_WIFI_NAME[32];
-char STA_WIFI_PASS[32];
 #define STA_WIFI_PORT "80"
 
 #define AP_WIFI_NAME "AIoT: "
@@ -39,7 +37,6 @@ enum WIFI_STATE
     MODE_CONFIG,
 };
 
-WIFI_STATE WiFi_STATE = MODE_STARTUP_STA;
 template <class Transport>
 class PnP
 {
@@ -48,7 +45,7 @@ class PnP
     DNSServer dnsServer;
 
 public:
-    PnP() {};
+    PnP() : WiFi_STATE(MODE_STARTUP_STA), _userConfiguring(false), _serverConfigured(false), _lastActivityTime(0) {};
     bool setupAndVerifyNetwork();
     // STARTUP_STATE
     void begin(const char *sta_ssid, const char *sta_pass);
@@ -56,6 +53,16 @@ public:
 
     // LOOP STATE
     void run();
+
+    // Co cau hinh tu nguoi dung
+    void setUserConfiguring(bool configuring)
+    {
+        _userConfiguring = configuring;
+        if (configuring)
+            _lastActivityTime = millis();
+    }
+    bool isUserConfiguring() const { return _userConfiguring; }
+    WIFI_STATE getState() const { return WiFi_STATE; }
 
     // SYSTEM Module
     void SaveWiFi(String newSSID, String newPASS);
@@ -79,8 +86,6 @@ public:
     void RUN_AP_WEB();
 
     // CONFIG_MODULE
-    static const char WebConfigHEAD[] PROGMEM;
-    static const char WebConfigFOOT[] PROGMEM;
     void ConfigPage();
     void ConfigMQTTPage();
     void ConfigWiFiPage();
@@ -92,16 +97,21 @@ public:
     void handler_button();
 
 private:
+    WIFI_STATE WiFi_STATE;
+    bool _userConfiguring;
+    bool _serverConfigured;
+    unsigned long _lastActivityTime;
+
     IPAddress _ipAddr;
     // ===== STA ===== //
     char _sta_ssid[64];
-    char _sta_pass[32];
+    char _sta_pass[64];
     char _sta_ip[16];
     char _sta_port[5] = STA_WIFI_PORT;
     int _rssi;
     // ===== AP ===== //
     char _ap_ssid[64] = AP_WIFI_NAME;
-    char _ap_pass[32] = AP_WIFI_PASS;
+    char _ap_pass[64] = AP_WIFI_PASS;
     char _ap_ip[16] = AP_WIFI_IP;
     char _ap_port[5] = AP_WIFI_PORT;
     char _mac[18];
@@ -114,7 +124,7 @@ private:
     char _mqtt_pass[64];
 
     unsigned long t0, t1, t2;
-    int time_STA = 20000;
+    int time_STA = 8000;
 
 #define Saved_WiFi_MAX 3
 #define Scan_WiFi_MAX 10
@@ -140,6 +150,7 @@ inline void PnP<Transport>::SaveWiFi(String newSSID, String newPASS)
 {
     if (newSSID.length() == 0)
         return;
+    loadWiFi();
     if (!prefs.begin("wifi", false))
     {
         LOG_ERROR("WIFI", "NVS OPEN FAIL");
@@ -224,7 +235,7 @@ inline void PnP<Transport>::SaveMQTT(String mqttuser, String mqttpass)
         return;
     loadMQTT();
     // =========================
-    // USER & PASS GIỐNG -> SKIP
+    // USER & PASS GIONG -> SKIP
     // =========================
     if ((mqttuser == _mqtt_username) && (mqttpass == _mqtt_pass))
     {
@@ -232,7 +243,7 @@ inline void PnP<Transport>::SaveMQTT(String mqttuser, String mqttpass)
         return;
     }
     // =========================
-    // USER GIỐNG - PASS KHÁC
+    // USER GIONG - PASS KHAC
     // =========================
     if (mqttuser == _mqtt_username &&
         mqttpass != _mqtt_pass)
@@ -248,14 +259,21 @@ inline void PnP<Transport>::SaveMQTT(String mqttuser, String mqttpass)
     prefs.putString("user", mqttuser);
     prefs.putString("pass", mqttpass);
     prefs.end();
-    strcpy(_mqtt_username, mqttuser.c_str());
-    strcpy(_mqtt_pass, mqttpass.c_str());
+    strncpy(_mqtt_username, mqttuser.c_str(), sizeof(_mqtt_username) - 1);
+    _mqtt_username[sizeof(_mqtt_username) - 1] = '\0';
+    strncpy(_mqtt_pass, mqttpass.c_str(), sizeof(_mqtt_pass) - 1);
+    _mqtt_pass[sizeof(_mqtt_pass) - 1] = '\0';
     LOG_MQTT("MQTT", "SAVE MQTT DONE");
 }
 
 template <class Transport>
 inline void PnP<Transport>::loadWiFi()
 {
+    for (int i = 0; i < Saved_WiFi_MAX; i++)
+    {
+        saved_ssid[i] = "";
+        saved_pass[i] = "";
+    }
     if (!prefs.begin("wifi", true))
         return;
     for (int i = 0; i < Saved_WiFi_MAX; i++)
@@ -266,11 +284,6 @@ inline void PnP<Transport>::loadWiFi()
         {
             saved_ssid[i] = ssid;
             saved_pass[i] = pass;
-        }
-        else
-        {
-            saved_ssid[i] = "";
-            saved_pass[i] = "";
         }
     }
     LOG_DEBUG("WIFI", "LOAD WiFi DONE");
@@ -287,8 +300,10 @@ inline void PnP<Transport>::loadMQTT()
     String user = prefs.getString("user", "");
     String pass = prefs.getString("pass", "");
     prefs.end();
-    strcpy(_mqtt_username, user.c_str());
-    strcpy(_mqtt_pass, pass.c_str());
+    strncpy(_mqtt_username, user.c_str(), sizeof(_mqtt_username) - 1);
+    _mqtt_username[sizeof(_mqtt_username) - 1] = '\0';
+    strncpy(_mqtt_pass, pass.c_str(), sizeof(_mqtt_pass) - 1);
+    _mqtt_pass[sizeof(_mqtt_pass) - 1] = '\0';
     LOG_DEBUG("MQTT", "LOAD MQTT DONE");
 }
 
@@ -300,6 +315,9 @@ inline void PnP<Transport>::resetCONFIGMODE()
 template <class Transport>
 inline void PnP<Transport>::handleSaveWiFi()
 {
+    _userConfiguring = true;
+    _lastActivityTime = millis();
+
     String reqSSID = webServer.arg("ssid");
     String reqPASS = webServer.arg("pass");
     String mqttUser = webServer.arg("mqtt_user");
@@ -318,17 +336,34 @@ inline void PnP<Transport>::handleSaveWiFi()
         SaveMQTT(mqttUser, mqttPass);
     }
 
-    webServer.send(200, "text/plain", "OK");
-    delay(500);
+    String resp = F("<!DOCTYPE html><html lang='vi'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'>"
+                    "<title>Đã Lưu Cấu Hình</title><style>"
+                    "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;color:#1e293b;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:16px;margin:0;}"
+                    ".card{background:#fff;border-radius:12px;padding:30px;max-width:380px;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,0.05);border:1px solid #e2e8f0;}"
+                    "h2{color:#10b981;font-size:20px;margin-bottom:12px;}"
+                    "p{font-size:14px;color:#64748b;line-height:1.5;margin-bottom:8px;}"
+                    ".note{font-size:12px;color:#94a3b8;margin-top:16px;}"
+                    "</style></head><body>"
+                    "<div class='card'>"
+                    "<h2>&#10004; Lưu Cấu Hình Thành Công!</h2>"
+                    "<p>Thiết bị đang chuyển sang chế độ WiFi và kết nối máy chủ...</p>"
+                    "<p class='note'>Bạn có thể ngắt kết nối với AP này.</p>"
+                    "</div></body></html>");
+    webServer.send(200, "text/html", resp);
+    delay(1000);
     webServer.stop();
     dnsServer.stop();
+    WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_STA);
+    _userConfiguring = false;
     WiFi_STATE = MODE_STARTUP_STA;
 }
 
 template <class Transport>
 inline void PnP<Transport>::handleSaveMQTT()
 {
+    _userConfiguring = true;
+    _lastActivityTime = millis();
     String mqttUser = webServer.arg("mqtt_user");
     String mqttPass = webServer.arg("mqtt_pass");
     SaveMQTT(mqttUser, mqttPass);
@@ -339,17 +374,28 @@ inline void PnP<Transport>::handleSaveMQTT()
 template <class Transport>
 inline void PnP<Transport>::handleScanWiFi()
 {
+    _userConfiguring = true;
+    _lastActivityTime = millis();
+
     WiFi.scanDelete();
     int n = WiFi.scanNetworks();
     String json = "[";
     if (n > 0)
     {
         int count = min(n, Scan_WiFi_MAX);
+        bool first = true;
         for (int i = 0; i < count; i++)
         {
-            if (i > 0)
+            String ssid = WiFi.SSID(i);
+            if (ssid.length() == 0)
+                continue;
+            ssid.replace("\\", "\\\\");
+            ssid.replace("\"", "\\\"");
+
+            if (!first)
                 json += ",";
-            json += "{\"ssid\":\"" + WiFi.SSID(i) + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+            json += "{\"ssid\":\"" + ssid + "\",\"rssi\":" + String(WiFi.RSSI(i)) + "}";
+            first = false;
         }
     }
     json += "]";
@@ -360,6 +406,8 @@ inline void PnP<Transport>::handleScanWiFi()
 template <class Transport>
 inline void PnP<Transport>::ConfigPage()
 {
+    _userConfiguring = true;
+    _lastActivityTime = millis();
     loadWiFi();
     loadMQTT();
     String curSSID = (saved_ssid[0].length() > 0) ? saved_ssid[0] : String(_sta_ssid);
@@ -389,8 +437,7 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass)
     WiFi.persistent(true);
     WiFi.setAutoReconnect(true);
     WiFi.setSleep(false);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    delay(500);
+    delay(200);
     strncpy(_sta_ssid, sta_ssid, sizeof(_sta_ssid) - 1);
     _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
     strncpy(_sta_pass, sta_pass, sizeof(_sta_pass) - 1);
@@ -404,7 +451,6 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass)
     LOG_WIFI("WIFI", "STA_WIFI_IP: %s", _sta_ip);
     LOG_WIFI("WIFI", "STA_WIFI_PORT: %s", _sta_port);
     LOG_DEBUG("WIFI", "STARTING CONFIG");
-    pinMode(CONFIG_BTN, INPUT_PULLUP);
 }
 template <class Transport>
 inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_username, const char *mqtt_pass)
@@ -413,8 +459,7 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, co
     WiFi.persistent(true);
     WiFi.setAutoReconnect(true);
     WiFi.setSleep(false);
-    WiFi.setTxPower(WIFI_POWER_19_5dBm);
-    delay(500);
+    delay(200);
     strncpy(_sta_ssid, sta_ssid, sizeof(_sta_ssid) - 1);
     _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
     strncpy(_sta_pass, sta_pass, sizeof(_sta_pass) - 1);
@@ -432,7 +477,6 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, co
     LOG_WIFI("WIFI", "STA_WIFI_IP: %s", _sta_ip);
     LOG_WIFI("WIFI", "STA_WIFI_PORT: %s", _sta_port);
     LOG_DEBUG("WIFI", "STARTING CONFIG");
-    pinMode(CONFIG_BTN, INPUT_PULLUP);
 }
 
 //======================================================
@@ -441,7 +485,7 @@ inline void PnP<Transport>::begin(const char *sta_ssid, const char *sta_pass, co
 template <class Transport>
 inline bool PnP<Transport>::setupAndVerifyNetwork()
 {
-    // 1. Chờ IP và Gateway từ DHCP
+    // 1. Cho IP va Gateway tu DHCP
     unsigned long t_ip = millis();
     while ((WiFi.localIP() == IPAddress(0, 0, 0, 0) || WiFi.gatewayIP() == IPAddress(0, 0, 0, 0)) && millis() - t_ip < 4000)
     {
@@ -454,33 +498,36 @@ inline bool PnP<Transport>::setupAndVerifyNetwork()
         return false;
     }
 
-    // 2. Cấu hình Primary DNS (Google 8.8.8.8) và Backup DNS (Cloudflare 1.1.1.1)
-    esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
-    if (netif)
+    // 2. Cau hinh Backup DNS (8.8.8.8 & 1.1.1.1) neu mang chua co DNS tu DHCP
+    if (WiFi.dnsIP(0) == IPAddress(0, 0, 0, 0))
     {
-        esp_netif_dns_info_t dns;
-        dns.ip.type = ESP_IPADDR_TYPE_V4;
-        dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
-        esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
-        dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
-        esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+        esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+        if (netif)
+        {
+            esp_netif_dns_info_t dns;
+            dns.ip.type = ESP_IPADDR_TYPE_V4;
+            dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+            esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+            dns.ip.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+            esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+        }
+        ip_addr_t d1, d2;
+        d1.type = IPADDR_TYPE_V4;
+        d1.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
+        dns_setserver(0, &d1);
+        d2.type = IPADDR_TYPE_V4;
+        d2.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
+        dns_setserver(1, &d2);
     }
-    ip_addr_t d1, d2;
-    d1.type = IPADDR_TYPE_V4;
-    d1.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(8, 8, 8, 8));
-    dns_setserver(0, &d1);
-    d2.type = IPADDR_TYPE_V4;
-    d2.u_addr.ip4.addr = static_cast<uint32_t>(IPAddress(1, 1, 1, 1));
-    dns_setserver(1, &d2);
 
-    // 3. Xác thực DNS hoạt động
+    // 3. Xac thuc DNS hoat dong
     IPAddress resolved;
     bool dnsOk = false;
     unsigned long t_dns = millis();
     while (!dnsOk && millis() - t_dns < 3000)
     {
-        if (WiFi.hostByName("74f78261a2504f078425eb1b85f3eaed.s1.eu.hivemq.cloud", resolved) == 1 ||
-            WiFi.hostByName("generativelanguage.googleapis.com", resolved) == 1)
+        if (WiFi.hostByName("google.com", resolved) == 1 ||
+            WiFi.hostByName("cloudflare.com", resolved) == 1)
         {
             dnsOk = true;
             break;
@@ -509,14 +556,14 @@ inline void PnP<Transport>::CONFIG_STA()
     loadWiFi();
     loadMQTT();
     // =========================
-    // 1. ƯU TIÊN WIFI INIT
+    // 1. UU TIEN WIFI INIT
     // =========================
     if (strlen(_sta_ssid) > 0)
     {
-        t1 = millis();
         WiFi.disconnect();
         delay(200);
         t1 = millis();
+        t0 = millis();
         WiFi.begin(_sta_ssid, _sta_pass);
         LOG_WIFI("WIFI", "CONNECT WIFI WITH: %s", _sta_ssid);
         while (WiFi.status() != WL_CONNECTED && millis() - t1 <= time_STA)
@@ -527,7 +574,7 @@ inline void PnP<Transport>::CONFIG_STA()
                 t0 = millis();
             }
             delay(10);
-            yield(); // Feed Watchdog Timer and yield to FreeRTOS scheduler
+            yield();
         }
         if (WiFi.status() == WL_CONNECTED)
         {
@@ -542,29 +589,31 @@ inline void PnP<Transport>::CONFIG_STA()
         }
     }
     // ========================================
-    // 2. KẾT NỐI VỚI WIFI ĐÃ LƯU TRONG BỘ NHỚ
+    // 2. KET NOI VOI WIFI DA LUU TRONG BO NHO
     // ========================================
     for (int i = 0; i < Saved_WiFi_MAX; i++)
     {
         if (saved_ssid[i].length() == 0)
             continue;
         LOG_WIFI("WIFI", "FOUND MATCH: %s", saved_ssid[i].c_str());
+        WiFi.disconnect();
+        delay(100);
         t1 = millis();
+        t0 = millis();
         WiFi.begin(saved_ssid[i].c_str(), saved_pass[i].c_str());
         LOG_WIFI("WIFI", "CONNECT WIFI WITH: %s", saved_ssid[i].c_str());
         while (WiFi.status() != WL_CONNECTED && millis() - t1 <= time_STA)
         {
-            if (millis() - t0 > 1000)
+            if (millis() - t0 >= 1000)
             {
                 LOG_WIFI("WIFI", "CONNECTING....... %ds", (millis() - t1) / 1000);
                 t0 = millis();
             }
             delay(10);
-            yield(); // Feed Watchdog Timer and yield to FreeRTOS scheduler
+            yield();
         }
         if (WiFi.status() == WL_CONNECTED)
         {
-            // Lưu lại SSID hiện tại vào bộ nhớ tạm để phục vụ Reconnect sau này
             strncpy(_sta_ssid, saved_ssid[i].c_str(), sizeof(_sta_ssid) - 1);
             _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
             strncpy(_sta_pass, saved_pass[i].c_str(), sizeof(_sta_pass) - 1);
@@ -581,7 +630,7 @@ inline void PnP<Transport>::CONFIG_STA()
         }
     }
     // =====================================
-    // 3. KHÔNG THỂ KẾT NỐI WIFI -> AP MODE
+    // 3. KHONG THE KET NOI WIFI -> AP MODE
     // =====================================
     LOG_WIFI("WIFI", "NO WIFI CONNECTED -> AP MODE");
     WiFi.disconnect();
@@ -635,7 +684,6 @@ inline void PnP<Transport>::CONFIG_MQTT()
             Serial.println("       - Gõ bất kỳ câu hỏi nào để trò chuyện cùng AI");
             Serial.println("=================================================================");
         }
-        SaveMQTT(mqttusername, mqttpass);
         WiFi_STATE = MODE_CONNECTED;
         delay(500);
         return;
@@ -674,15 +722,11 @@ inline void PnP<Transport>::CONNECTED()
 //======================================================
 // AUTO FIX RUNNING
 //======================================================
-// ======================================================
-// CONFIG_STA - RECONNECT WIFI (STA ONLY)
-// ======================================================
 template <class Transport>
 inline void PnP<Transport>::RECONNECT_WIFI()
 {
     LOG_WIFI("WIFI", "RECONNECTING WIFI...");
 
-    // Đồng bộ SSID từ bộ nhớ Flash NVS nếu biến tạm bị rỗng
     if (strlen(_sta_ssid) == 0)
     {
         loadWiFi();
@@ -695,7 +739,6 @@ inline void PnP<Transport>::RECONNECT_WIFI()
         }
     }
 
-    // Nếu không có bất kỳ SSID nào được cấu hình -> Chuyển sang AP để người dùng cấu hình
     if (strlen(_sta_ssid) == 0 && saved_ssid[0].length() == 0)
     {
         LOG_ERROR("WIFI", "NO SAVED WIFI FOUND! SWITCHING TO AP MODE...");
@@ -709,7 +752,7 @@ inline void PnP<Transport>::RECONNECT_WIFI()
     WiFi.setAutoReconnect(true);
 
     // =========================
-    // 1. THỬ WIFI HIỆN TẠI
+    // 1. THU WIFI HIEN TAI
     // =========================
     if (strlen(_sta_ssid) > 0)
     {
@@ -741,7 +784,7 @@ inline void PnP<Transport>::RECONNECT_WIFI()
     }
 
     // =========================
-    // 2. FALLBACK WIFI TRONG BỘ NHỚ
+    // 2. FALLBACK WIFI TRONG BO NHO
     // =========================
     for (int i = 0; i < Saved_WiFi_MAX; i++)
     {
@@ -786,9 +829,6 @@ template <class Transport>
 inline void PnP<Transport>::RECONNECT_MQTT()
 {
     LOG_MQTT("MQTT", "RECONNECT MQTT...");
-    // =========================
-    // CHECK WIFI TRƯỚC
-    // =========================
     if (WiFi.status() != WL_CONNECTED)
     {
         LOG_ERROR("MQTT", "NO WIFI -> SWITCH TO WIFI RECOVERY");
@@ -796,9 +836,6 @@ inline void PnP<Transport>::RECONNECT_MQTT()
         return;
     }
 
-    // =========================
-    // CẤU HÌNH TÀI KHOẢN NẾU CÓ
-    // =========================
     if (strlen(_mqtt_username) > 0)
     {
         serverMQTT.config(_mqtt_username, _mqtt_pass);
@@ -810,19 +847,12 @@ inline void PnP<Transport>::RECONNECT_MQTT()
 
     serverMQTT.begin();
 
-    // =========================
-    // SUCCESS
-    // =========================
     if (serverMQTT.check_connect())
     {
         LOG_MQTT("MQTT", "MQTT RECONNECTED OK");
-        SaveMQTT(mqttusername, mqttpass);
         WiFi_STATE = MODE_CONNECTED;
         return;
     }
-    // =========================
-    // FAIL
-    // =========================
     LOG_ERROR("MQTT", "RECONNECT FAILED");
     WiFi_STATE = MODE_FAILD_CONNECT_MQTT;
 }
@@ -841,7 +871,6 @@ inline void PnP<Transport>::FAILD_MQTT()
         mqttRetryTimerStarted = true;
     }
 
-    // Nếu Wi-Fi bị mất trong lúc này -> Chuyển ngay sang chế độ phục hồi Wi-Fi
     if (WiFi.status() != WL_CONNECTED)
     {
         mqttRetryTimerStarted = false;
@@ -850,7 +879,6 @@ inline void PnP<Transport>::FAILD_MQTT()
         return;
     }
 
-    // Nếu Wi-Fi vẫn còn nhưng MQTT rớt, tự động thử lại sau mỗi 5 giây
     if ((unsigned long)(millis() - lastMqttRetry) >= 5000UL)
     {
         mqttRetryTimerStarted = false;
@@ -902,37 +930,56 @@ inline void PnP<Transport>::CONFIG_AP()
     dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
     dnsServer.start(53, "*", local_ip);
 
-    webServer.on("/", HTTP_GET, [this]()
-                 { this->ConfigPage(); });
-    webServer.on("/scan", HTTP_GET, [this]()
-                 { this->handleScanWiFi(); });
-    webServer.on("/save", HTTP_POST, [this]()
-                 { this->handleSaveWiFi(); });
-    webServer.on("/restart", HTTP_POST, [this]()
-                 {
-        webServer.send(200, "text/plain", "RESTARTING");
-        delay(500);
-        ESP.restart(); });
-    webServer.on("/reset", HTTP_POST, [this]()
-                 {
-        webServer.send(200, "text/plain", "RESETTING");
-        delay(500);
-        prefs.begin("wifi", false);
-        prefs.clear();
-        prefs.end();
-        prefs.begin("mqtt", false);
-        prefs.clear();
-        prefs.end();
-        ESP.restart(); });
-    // Captive Portal redirection
-    webServer.on("/generate_204", HTTP_GET, [this]()
-                 { this->ConfigPage(); });
-    webServer.on("/hotspot-detect.html", HTTP_GET, [this]()
-                 { this->ConfigPage(); });
-    webServer.on("/canonical.html", HTTP_GET, [this]()
-                 { this->ConfigPage(); });
-    webServer.onNotFound([this]()
-                         { this->ConfigPage(); });
+    if (!_serverConfigured)
+    {
+        webServer.on("/", HTTP_GET, [this]()
+                     { this->ConfigPage(); });
+        webServer.on("/scan", HTTP_GET, [this]()
+                     { this->handleScanWiFi(); });
+        webServer.on("/save", HTTP_POST, [this]()
+                     { this->handleSaveWiFi(); });
+        webServer.on("/restart", HTTP_POST, [this]()
+                     {
+            webServer.send(200, "text/plain", "RESTARTING");
+            delay(500);
+            ESP.restart(); });
+        webServer.on("/reset", HTTP_POST, [this]()
+                     {
+            webServer.send(200, "text/plain", "RESETTING");
+            delay(500);
+            prefs.begin("wifi", false);
+            prefs.clear();
+            prefs.end();
+            prefs.begin("mqtt", false);
+            prefs.clear();
+            prefs.end();
+            WiFi.disconnect(true, true);
+            ESP.restart(); });
+        webServer.on("/start_config", HTTP_GET, [this]()
+                     {
+            _userConfiguring = true;
+            _lastActivityTime = millis();
+            webServer.send(200, "text/plain", "OK"); });
+        // Captive Portal redirection
+        webServer.on("/generate_204", HTTP_GET, [this]()
+                     { this->ConfigPage(); });
+        webServer.on("/hotspot-detect.html", HTTP_GET, [this]()
+                     { this->ConfigPage(); });
+        webServer.on("/canonical.html", HTTP_GET, [this]()
+                     { this->ConfigPage(); });
+        webServer.onNotFound([this]()
+                             {
+            String host = webServer.hostHeader();
+            if (host.length() > 0 && host != _ap_ip)
+            {
+                webServer.sendHeader("Location", String("http://") + _ap_ip + "/", true);
+                webServer.send(302, "text/plain", "");
+                return;
+            }
+            this->ConfigPage(); });
+
+        _serverConfigured = true;
+    }
 
     webServer.begin();
     LOG_WIFI("AP", "WEB CONFIG READY AT http://%s", _ap_ip);
@@ -944,7 +991,7 @@ template <class Transport>
 inline void PnP<Transport>::handler_button()
 {
 #ifdef BUTTON_CONFIG
-
+    // Cau hinh nut nhan neu can
 #endif
 }
 
@@ -991,46 +1038,101 @@ inline void PnP<Transport>::run()
     case MODE_CONFIG:
         dnsServer.processNextRequest();
         webServer.handleClient();
+
+        // 1. Tu dong bat co neu co bat ky thiet bi nao ket noi vao SoftAP
+        if (WiFi.softAPgetStationNum() > 0)
+        {
+            if (!_userConfiguring)
+            {
+                LOG_WIFI("AP", "STATION DETECTED ON AP -> USER CONFIGURING FLAG ACTIVATED!");
+                _userConfiguring = true;
+            }
+            _lastActivityTime = millis();
+        }
+
+        // 2. Tu dong ha co neu khong con ai ket noi AP va khong co thao tac web trong 3 phut
+        if (_userConfiguring && WiFi.softAPgetStationNum() == 0 && (millis() - _lastActivityTime > 180000UL))
+        {
+            LOG_WIFI("AP", "USER INACTIVE FOR 3 MINS -> RESET CONFIG FLAG");
+            _userConfiguring = false;
+        }
+
+        // 3. Neu DANG CO CO (Nguoi dung dang cau hinh):
+        // KHONG KET NOI NGAM, giu nguyen kenh phat cua AP de song on dinh cho nguoi dung thao tac!
+        if (_userConfiguring)
+        {
+            break;
+        }
+
+        // 4. Neu CHUA CO CO (Chua ai vao cau hinh):
+        // Dinh ky moi 15 giay thu ket noi ngam voi cac WiFi cu trong NVS
         {
             static unsigned long lastAPRetry = 0;
-            static bool apRetryTimerStarted = false;
-            if (!apRetryTimerStarted)
-            {
-                lastAPRetry = millis();
-                apRetryTimerStarted = true;
-            }
-            // Định kỳ mỗi 15 giây, tự động kiểm tra xem WiFi đã lưu có hoạt động lại không
             if ((unsigned long)(millis() - lastAPRetry) > 15000UL)
             {
                 lastAPRetry = millis();
                 loadWiFi();
+
                 bool hasKnown = (strlen(_sta_ssid) > 0) || (saved_ssid[0].length() > 0);
                 if (hasKnown)
                 {
-                    const char *targetSSID = (strlen(_sta_ssid) > 0) ? _sta_ssid : saved_ssid[0].c_str();
-                    const char *targetPass = (strlen(_sta_ssid) > 0) ? _sta_pass : saved_pass[0].c_str();
-                    LOG_WIFI("AP", "CHECKING IF KNOWN WIFI '%s' IS BACK ONLINE...", targetSSID);
-                    WiFi.begin(targetSSID, targetPass);
-                    unsigned long checkStart = millis();
-                    while (WiFi.status() != WL_CONNECTED && millis() - checkStart < 8000)
+                    for (int i = 0; i < Saved_WiFi_MAX; i++)
                     {
-                        dnsServer.processNextRequest();
-                        webServer.handleClient();
-                        delay(50);
-                    }
-                    if (WiFi.status() == WL_CONNECTED)
-                    {
-                        LOG_WIFI("AP", "RECONNECTED TO '%s'! CLOSING AP MODE...", targetSSID);
-                        webServer.stop();
-                        dnsServer.stop();
-                        WiFi.softAPdisconnect(true);
-                        WiFi.mode(WIFI_STA);
-                        strncpy(_sta_ssid, targetSSID, sizeof(_sta_ssid) - 1);
-                        _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
-                        strncpy(_sta_pass, targetPass, sizeof(_sta_pass) - 1);
-                        _sta_pass[sizeof(_sta_pass) - 1] = '\0';
-                        setupAndVerifyNetwork();
-                        WiFi_STATE = MODE_CONNECT_MQTT;
+                        String targetSSID = (i == 0 && strlen(_sta_ssid) > 0) ? String(_sta_ssid) : saved_ssid[i];
+                        String targetPass = (i == 0 && strlen(_sta_ssid) > 0) ? String(_sta_pass) : saved_pass[i];
+
+                        if (targetSSID.length() == 0)
+                            continue;
+
+                        // Neu phat hien nguoi dung vua ket noi AP -> DUNG NGAY
+                        if (WiFi.softAPgetStationNum() > 0 || _userConfiguring)
+                        {
+                            _userConfiguring = true;
+                            _lastActivityTime = millis();
+                            break;
+                        }
+
+                        LOG_WIFI("AP", "BACKGROUND RETRYING KNOWN WIFI: '%s'...", targetSSID.c_str());
+                        WiFi.begin(targetSSID.c_str(), targetPass.c_str());
+
+                        unsigned long checkStart = millis();
+                        while (WiFi.status() != WL_CONNECTED && millis() - checkStart < 5000)
+                        {
+                            dnsServer.processNextRequest();
+                            webServer.handleClient();
+
+                            // Bat duoc nguoi dung vua ket noi AP hoac mo web -> NGAT THU NGAM LAP TUC!
+                            if (WiFi.softAPgetStationNum() > 0 || _userConfiguring)
+                            {
+                                WiFi.disconnect();
+                                _userConfiguring = true;
+                                _lastActivityTime = millis();
+                                LOG_WIFI("AP", "ABORT BACKGROUND RETRY: USER CONNECTED!");
+                                break;
+                            }
+                            delay(50);
+                        }
+
+                        if (WiFi.status() == WL_CONNECTED)
+                        {
+                            LOG_WIFI("AP", "RECONNECTED TO '%s'! CLOSING AP MODE...", targetSSID.c_str());
+                            webServer.stop();
+                            dnsServer.stop();
+                            WiFi.softAPdisconnect(true);
+                            WiFi.mode(WIFI_STA);
+                            strncpy(_sta_ssid, targetSSID.c_str(), sizeof(_sta_ssid) - 1);
+                            _sta_ssid[sizeof(_sta_ssid) - 1] = '\0';
+                            strncpy(_sta_pass, targetPass.c_str(), sizeof(_sta_pass) - 1);
+                            _sta_pass[sizeof(_sta_pass) - 1] = '\0';
+                            setupAndVerifyNetwork();
+                            _userConfiguring = false;
+                            WiFi_STATE = MODE_CONNECT_MQTT;
+                            return;
+                        }
+
+                        // Neu co bat thi dung duyet
+                        if (_userConfiguring)
+                            break;
                     }
                 }
             }

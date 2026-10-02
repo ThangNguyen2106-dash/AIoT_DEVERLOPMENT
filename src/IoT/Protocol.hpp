@@ -29,6 +29,10 @@ public:
     void begin(const char *sta_ssid, const char *sta_pass, const char *mqtt_id, const char *mqtt_auth);
     void run();
 
+    void setUserConfiguring(bool configuring);
+    bool isUserConfiguring() const;
+    WIFI_STATE getWiFiState() const;
+
     bool CheckConnect();
 
     template <typename... Args>
@@ -256,6 +260,21 @@ inline bool AIoTProtocol::CheckConnect()
     {
         return false;
     }
+}
+
+inline void AIoTProtocol::setUserConfiguring(bool configuring)
+{
+    this->PNP.setUserConfiguring(configuring);
+}
+
+inline bool AIoTProtocol::isUserConfiguring() const
+{
+    return this->PNP.isUserConfiguring();
+}
+
+inline WIFI_STATE AIoTProtocol::getWiFiState() const
+{
+    return this->PNP.getState();
 }
 
 inline void AIoTProtocol::run()
