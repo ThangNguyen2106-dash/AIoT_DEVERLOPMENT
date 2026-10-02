@@ -1,7 +1,8 @@
 // #define DEBUG_COLOR
 #include <Arduino.h>
-#include <secrets.h>
+#include "secrets.h"
 #include <AIoT.h>
+
 #define SENSOR_1 36
 #define SENSOR_2 39
 #define SENSOR_3 34
@@ -13,6 +14,7 @@
 #define BUTTON1 23
 #define BUTTON2 5
 #define BUTTON3 13
+
 int8_t SENSOR[4] = {SENSOR_1, SENSOR_2, SENSOR_3, SENSOR_4};
 int8_t OUT[4] = {OUT1, OUT2, OUT3, OUT4};
 int8_t BUTTON[3] = {BUTTON1, BUTTON2, BUTTON3};
@@ -25,6 +27,7 @@ bool lastButtonState = HIGH;
 bool stableButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
 const unsigned long debounceDelay = 50;
+
 void handleButton()
 {
     bool reading = digitalRead(BUTTON1);
@@ -103,3 +106,4 @@ void loop()
         break;
     }
 }
+
